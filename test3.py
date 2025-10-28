@@ -54,44 +54,44 @@ def extract_variables(input_data):
 xmass, xpair_trans_mom, xrapidity, xpair_mom, xfirst_mom, xsecond_mom = extract_variables(xdata)
 
 # plot histograms of variables
-plt.hist(xmass, bins=100, histtype='step', label='Invariant Mass of Muon Pairs')
+plt.hist(xmass, bins=1000, histtype='step', label='Invariant Mass of Muon Pairs')
 plt.xlabel('Invariant Mass (GeV/c^2)')
 plt.ylabel('Number of Events')
 plt.xlim(min(xmass), max(xmass))
 plt.title('Histogram of Invariant Mass of Muon Pairs')
 plt.show()
 
-plt.hist(xpair_trans_mom, bins=100, histtype='step', label='Transverse Momentum of Muon Pairs', color='orange')
+plt.hist(xpair_trans_mom, bins=1000, histtype='step', label='Transverse Momentum of Muon Pairs', color='orange')
 plt.xlabel('Transverse Momentum (GeV/c)')
 plt.ylabel('Number of Events')
-
+plt.xlim(max(xpair_trans_mom), min(xpair_trans_mom))
 plt.title('Histogram of Transverse Momentum of Muon Pairs')
 plt.show()
 
-plt.hist(xrapidity, bins=100, histtype='step', label='Rapidity of Muon Pairs', color='green')
+plt.hist(xrapidity, bins=1000, histtype='step', label='Rapidity of Muon Pairs', color='green')
 plt.xlabel('Rapidity')
 plt.ylabel('Number of Events')
 plt.xlim(min(xrapidity), max(xrapidity))
 plt.title('Histogram of Rapidity of Muon Pairs')
 plt.show()
 
-plt.hist(xpair_mom, bins=100, histtype='step', label='Momentum of Muon Pairs', color='red')
+plt.hist(xpair_mom, bins=1000, histtype='step', label='Momentum of Muon Pairs', color='red')
 plt.xlabel('Momentum (GeV/c)')
 plt.ylabel('Number of Events')
-
+plt.xlim
 plt.title('Histogram of Momentum of Muon Pairs')   
 plt.show()
 
-plt.hist(xfirst_mom, bins=100, histtype='step', label='Transverse Momentum of First Muon', color='purple')
+plt.hist(xfirst_mom, bins=1000, histtype='step', label='Transverse Momentum of First Muon', color='purple')
 plt.xlabel('Transverse Momentum (GeV/c)')
 plt.ylabel('Number of Events')
-
+plt
 plt.title('Histogram of Transverse Momentum of First Muon')
 plt.show()
 
-plt.hist(xsecond_mom, bins=100, histtype='step', label='Transverse Momentum of Second Muon', color='brown')
+plt.hist(xsecond_mom, bins=1000, histtype='step', label='Transverse Momentum of Second Muon', color='brown')
 plt.xlabel('Transverse Momentum (GeV/c)')
 plt.ylabel('Number of Events')
-
+plt.xlim(min(xsecond_mom), max(xsecond_mom))
 plt.title('Histogram of Transverse Momentum of Second Muon')
 plt.show()
