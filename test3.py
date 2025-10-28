@@ -1,6 +1,7 @@
 import sys
 import numpy as np
 import scipy as sp
+from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 
 
@@ -113,5 +114,13 @@ Iupper_bound = 9.6
 inv_mass_regionI = [mass for mass in xmass if Ilower_bound <= mass <= Iupper_bound]
 
 
-plt.hist(inv_mass_regionI, bins=100, histtype='step', label='Invariant Mass of Muon Pairs in Region I', color='cyan')
+entries, bedges, ps = plt.hist(inv_mass_regionI, bins=100, histtype='step', label='Invariant Mass of Muon Pairs in Region I', color='cyan')
 plt.show()
+
+def gauss_exp(x, A, mu, sigma, B, C, D):
+    return A * np.exp(- (x - mu)**2 / (2 * sigma**2)) + B - C * np.exp(-D * x)
+
+parameters, pcov = curve_fit(gauss_exp, bedges, entries)
+
+
+print(parameters)
