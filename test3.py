@@ -2,8 +2,7 @@ import sys
 import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
-from scipy import stats
-from scipy.stats import norm 
+
 
 # import data
 #xmass = np.loadtxt(sys.argv[1])
