@@ -18,7 +18,7 @@ xmass = []
 for i in range(0,nevent):
     xmass.append(xdata[i][0])
 #    if i < 10:
-        print(xmass[i])
+#        print(xmass[i])
 
 # make a list of the transverse momentum of muon pairs
 xpair_trans_mom = []
