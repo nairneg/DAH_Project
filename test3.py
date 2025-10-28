@@ -64,7 +64,7 @@ plt.show()
 plt.hist(xpair_trans_mom, bins=1000, histtype='step', label='Transverse Momentum of Muon Pairs', color='orange')
 plt.xlabel('Transverse Momentum (GeV/c)')
 plt.ylabel('Number of Events')
-
+plt.ticklabel_format(axis='y', style='sci', scilimits=(0,0))
 plt.title('Histogram of Transverse Momentum of Muon Pairs')
 plt.show()
 
@@ -78,14 +78,14 @@ plt.show()
 plt.hist(xpair_mom, bins=1000, histtype='step', label='Momentum of Muon Pairs', color='red')
 plt.xlabel('Momentum (GeV/c)')
 plt.ylabel('Number of Events')
-
+plt.ticklabel_format(axis='y', style='sci', scilimits=(0,0))
 plt.title('Histogram of Momentum of Muon Pairs')   
 plt.show()
 
 plt.hist(xfirst_mom, bins=1000, histtype='step', label='Transverse Momentum of First Muon', color='purple')
 plt.xlabel('Transverse Momentum (GeV/c)')
 plt.ylabel('Number of Events')
-plt
+plt.ticklabel_format(axis='y', style='sci', scilimits=(0,0))
 plt.title('Histogram of Transverse Momentum of First Muon')
 plt.show()
 
@@ -93,5 +93,5 @@ plt.hist(xsecond_mom, bins=1000, histtype='step', label='Transverse Momentum of 
 plt.xlabel('Transverse Momentum (GeV/c)')
 plt.ylabel('Number of Events')
 plt.title('Histogram of Transverse Momentum of Second Muon')
-plt.ticklabel_format(axis='y', style='sci')
+plt.ticklabel_format(axis='y', style='sci', scilimits=(0,0))
 plt.show()
