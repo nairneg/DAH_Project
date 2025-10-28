@@ -117,11 +117,19 @@ inv_mass_regionI = [mass for mass in xmass if Ilower_bound <= mass <= Iupper_bou
 entries, bedges, ps = plt.hist(inv_mass_regionI, bins=100, histtype='step', label='Invariant Mass of Muon Pairs in Region I', color='cyan')
 plt.show()
 
-def gauss_exp(x, A, mu, sigma, B, C, D):
-    return A * np.exp(- (x - mu)**2 / (2 * sigma**2)) + B - C * np.exp(-D * x)
-
+def gauss_exp(x, A, mu, sigma, B ,C):
+    return A * np.exp(- (x - mu)**2 / (2 * sigma**2)) + B * np.exp(-C * x)
 bin_centers = 0.5 * (bedges[:-1] + bedges[1:])
-p0 = [max(entries), bin_centers[np.argmax(entries)], 0.1, min(entries), 0.0, 1.0]  # A, mu, sigma, B, C, D
+p0 = [max(entries), bin_centers[np.argmax(entries)], 0.1, 4000000, 0.01]  # A, mu, sigma, B, C
 
 parameters, pcov = curve_fit(gauss_exp, bin_centers, entries, p0=p0)
 print(parameters)
+
+
+plt.hist(inv_mass_regionI, bins=100, histtype='step', label='Invariant Mass of Muon Pairs in Region I', color='cyan')
+plt.plot(bin_centers, gauss_exp(bin_centers, *parameters), 'r--', label='Fitted Gaussian')
+plt.xlabel('Invariant Mass (GeV/c^2)')
+plt.ylabel('Number of Events')
+plt.title('Histogram of Invariant Mass of Muon Pairs in Region I with Gaussian Fit')
+plt.legend()
+plt.show()
