@@ -103,3 +103,15 @@ plt.title('Histogram of Transverse Momentum of Second Muon')
 plt.ticklabel_format(axis='y', style='sci', scilimits=(0,0))
 plt.savefig('second_muon_transverse_momentum_histogram.svg', format='svg')
 plt.show()
+
+
+
+Ilower_bound = 9.3
+Iupper_bound = 9.6
+
+
+inv_mass_regionI = [mass for mass in xmass if Ilower_bound <= mass <= Iupper_bound]
+
+
+plt.hist(inv_mass_regionI, bins=100, histtype='step', label='Invariant Mass of Muon Pairs in Region I', color='cyan')
+plt.show()
