@@ -1,9 +1,10 @@
+import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
 # import data
 #xmass = np.loadtxt(sys.argv[1])
-f = open("ups-15-small.bin","r")
+f = open("../ups-15-small.bin","r")
 datalist = np.fromfile(f,dtype=np.float32)
 
 # number of events
