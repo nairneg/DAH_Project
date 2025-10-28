@@ -146,7 +146,7 @@ parameters, pcov = curve_fit(gauss_exp_norm, bin_centers, entries/len(inv_mass_r
 print(parameters)
 
 plt.hist(inv_mass_regionI / len(inv_mass_regionI), bins=100, density=True, histtype='step', label='Invariant Mass of Muon Pairs in Region I', color='cyan')
-plt.plot(bin_centers, gauss_exp_norm(bin_centers, *parameters), 'r'--, label='Fitted Gaussian + Exponential + Constant')
+plt.plot(bin_centers, gauss_exp_norm(bin_centers, *parameters), 'r--', label='Fitted Gaussian + Exponential + Constant')
 plt.xlabel('Invariant Mass (GeV/c^2)')
 plt.ylabel('Normalized Number of Events')
 plt.title('Normalized Histogram of Invariant Mass of Muon Pairs in Region I with Gaussian + Exponential + Constant Fit')
