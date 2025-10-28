@@ -55,7 +55,7 @@ def extract_variables(input_data):
     return xmass, xpair_trans_mom, xrapidity, xpair_mom, xfirst_mom, xsecond_mom
 
 xmass, xpair_trans_mom, xrapidity, xpair_mom, xfirst_mom, xsecond_mom = extract_variables(xdata)
-
+'''
 # plot histograms of variables
 plt.hist(xmass, bins=500, histtype='step', label='Invariant Mass of Muon Pairs')
 plt.xlabel('Invariant Mass (GeV/c^2)')
@@ -104,7 +104,7 @@ plt.title('Histogram of Transverse Momentum of Second Muon')
 plt.ticklabel_format(axis='y', style='sci', scilimits=(0,0))
 plt.savefig('second_muon_transverse_momentum_histogram.svg', format='svg')
 plt.show()
-
+'''
 
 
 Ilower_bound = 9.3
