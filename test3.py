@@ -120,7 +120,8 @@ plt.show()
 def gauss_exp(x, A, mu, sigma, B, C, D):
     return A * np.exp(- (x - mu)**2 / (2 * sigma**2)) + B - C * np.exp(-D * x)
 
-parameters, pcov = curve_fit(gauss_exp, inv_mass_regionI, entries)
+bin_centers = 0.5 * (bedges[:-1] + bedges[1:])
+p0 = [max(entries), bin_centers[np.argmax(entries)], 0.1, min(entries), 0.0, 1.0]  # A, mu, sigma, B, C, D
 
-
+parameters, pcov = curve_fit(gauss_exp, bin_centers, entries, p0=p0)
 print(parameters)
