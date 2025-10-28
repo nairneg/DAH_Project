@@ -122,6 +122,7 @@ def gauss_exp(x, A, mu, sigma, B ,C):
 bin_centers = 0.5 * (bedges[:-1] + bedges[1:])
 p0 = [max(entries), bin_centers[np.argmax(entries)], 0.1, 4000000, 0.01]  # A, mu, sigma, B, C
 
+'''
 parameters, pcov = curve_fit(gauss_exp, bin_centers, entries, p0=p0)
 print(parameters)
 
@@ -131,5 +132,23 @@ plt.plot(bin_centers, gauss_exp(bin_centers, *parameters), 'r--', label='Fitted 
 plt.xlabel('Invariant Mass (GeV/c^2)')
 plt.ylabel('Number of Events')
 plt.title('Histogram of Invariant Mass of Muon Pairs in Region I with Gaussian Fit')
+plt.legend()
+plt.show()
+'''
+
+#  Create Normalised function
+def gauss_exp_norm(x, A, mu, sigma, B ,C, D):
+    return A * np.exp(- (x - mu)**2 / (2 * sigma**2)) + B * np.exp(-C * x) + D
+
+bin_centers = 0.5 * (bedges[:-1] + bedges[1:])
+p0 = [max(entries), bin_centers[np.argmax(entries)], 0.1, min(entries), 0.0, 1.0]  # A, mu, sigma, B, C, D
+parameters, pcov = curve_fit(gauss_exp_norm, bin_centers, entries/len(inv_mass_regionI), p0=p0)
+print(parameters)
+
+plt.hist(inv_mass_regionI / len(inv_mass_regionI), bins=100, density=True, histtype='step', label='Invariant Mass of Muon Pairs in Region I', color='cyan')
+plt.plot(bin_centers, gauss_exp_norm(bin_centers, *parameters), 'r'--, label='Fitted Gaussian + Exponential + Constant')
+plt.xlabel('Invariant Mass (GeV/c^2)')
+plt.ylabel('Normalized Number of Events')
+plt.title('Normalized Histogram of Invariant Mass of Muon Pairs in Region I with Gaussian + Exponential + Constant Fit')
 plt.legend()
 plt.show()
