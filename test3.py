@@ -120,7 +120,7 @@ plt.show()
 def gauss_exp(x, A, mu, sigma, B, C, D):
     return A * np.exp(- (x - mu)**2 / (2 * sigma**2)) + B - C * np.exp(-D * x)
 
-parameters, pcov = curve_fit(gauss_exp, bedges, entries)
+parameters, pcov = curve_fit(gauss_exp, inv_mass_regionI, entries)
 
 
 print(parameters)
