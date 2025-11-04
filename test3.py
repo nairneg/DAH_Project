@@ -17,45 +17,25 @@ xdata = np.split(datalist,nevent)
 print(xdata[0])
 
 
-# make a finction to extract varialbles from xdata
-def extract_variables(input_data):
+xdata = datalist.reshape(nevent, 6)
 
-    # make list of invariant mass of events
-    xmass = []
-    for i in range(0,nevent):
-        xmass.append(xdata[i][0])
-    #    if i < 10:
-    #        print(xmass[i])
+# extract variable arrays
 
-    # make a list of the transverse momentum of muon pairs
-    xpair_trans_mom = []
-    for i in range(0,nevent):
-        xpair_trans_mom.append(xdata[i][1])
+def extract_variables(data):
+    """Extracts the 6 variable arrays (columns) from event data."""
+    list_array = [data[:, i] for i in range(data.shape[1])]
+    return list_array
 
-    # make a list of rapidity of muon pair
-    xrapidity = []
-    for i in range(0,nevent):
-        xrapidity.append(xdata[i][2])
 
-    # make a list of momentum of muon mairs
-    xpair_mom = []
-    for i in range(0,nevent):
-        xpair_mom.append(xdata[i][3])
+list_array = extract_variables(xdata)
 
-    # make a list of the transverse momentum of first muon
-    xfirst_mom = []
-    for i in range(0,nevent):
-        xfirst_mom.append(xdata[i][4])
+inv_mass = list_array[0]
+xpair_trans_mom = list_array[1]
+xrapidity = list_array[2]
+xpair_mom = list_array[3]
+xfirst_mom = list_array[4]
+xsecond_mom = list_array[5]
 
-    # make a list of the transverse momentum of second muon
-    xsecond_mom = []
-    for i in range(0,nevent):
-        xsecond_mom.append(xdata[i][5])
-
-    return xmass, xpair_trans_mom, xrapidity, xpair_mom, xfirst_mom, xsecond_mom
-
-xmass, xpair_trans_mom, xrapidity, xpair_mom, xfirst_mom, xsecond_mom = extract_variables(xdata)
-'''
 # plot histograms of variables
 plt.hist(xmass, bins=500, histtype='step', label='Invariant Mass of Muon Pairs')
 plt.xlabel('Invariant Mass (GeV/c^2)')
@@ -104,7 +84,7 @@ plt.title('Histogram of Transverse Momentum of Second Muon')
 plt.ticklabel_format(axis='y', style='sci', scilimits=(0,0))
 plt.savefig('second_muon_transverse_momentum_histogram.svg', format='svg')
 plt.show()
-'''
+
 
 
 Ilower_bound = 9.3
