@@ -35,7 +35,7 @@ xrapidity = list_array[2]
 xpair_mom = list_array[3]
 xfirst_mom = list_array[4]
 xsecond_mom = list_array[5]
-
+'''
 # plot histograms of variables
 plt.hist(xmass, bins=500, histtype='step', label='Invariant Mass of Muon Pairs')
 plt.xlabel('Invariant Mass (GeV/c^2)')
@@ -84,7 +84,7 @@ plt.title('Histogram of Transverse Momentum of Second Muon')
 plt.ticklabel_format(axis='y', style='sci', scilimits=(0,0))
 plt.savefig('second_muon_transverse_momentum_histogram.svg', format='svg')
 plt.show()
-
+'''
 
 
 Ilower_bound = 9.3
@@ -112,5 +112,22 @@ plt.plot(bin_centers, gauss_exp(bin_centers, *parameters), 'r--', label='Fitted 
 plt.xlabel('Invariant Mass (GeV/c^2)')
 plt.ylabel('Number of Events')
 plt.title('Histogram of Invariant Mass of Muon Pairs in Region I with Gaussian Fit')
+plt.legend()
+plt.show()
+
+
+def norm_gauss(x, N, parameters):
+    A, mu, sigma, B, C = parameters
+    gauss = A * np.exp(- (x - mu)**2 / (2 * sigma**2)) + B * np.exp(-C * x)
+    return N * gauss
+bin_centers = 0.5 * (bedges[:-1] + bedges[1:])
+
+
+N = 1/np.sum(norm_gauss(bin_centers, 1, parameters))  # Normalization factor
+plt.hist(inv_mass_regionI/N, bins=100, density=True, histtype='step', label='Normalized Invariant Mass of Muon Pairs in Region I', color='cyan')
+plt.plot(bin_centers, norm_gauss(bin_centers, N, parameters), 'r--', label='Normalized Fitted Gaussian')
+plt.xlabel('Invariant Mass (GeV/c^2)')  
+plt.ylabel('Normalized Number of Events')
+plt.title('Normalized Histogram of Invariant Mass of Muon Pairs in Region I with Gaussian Fit')
 plt.legend()
 plt.show()
