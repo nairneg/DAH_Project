@@ -124,6 +124,7 @@ plt.title('Histogram of Invariant Mass of Muon Pairs in Region I with Gaussian F
 plt.legend()
 plt.show()
 
+'''
 plt.plot(bin_centers, test(bin_centers, *parameters, N), 'g-', label='Normalized Fit')
 #plt.hist(inv_mass_regionI, bins=100, histtype='step', label='Invariant Mass of Muon Pairs in Region I', color='cyan')
 plt.xlabel('Invariant Mass (GeV/c^2)')
@@ -131,5 +132,15 @@ plt.ylabel('Number of Events')
 plt.title('Histogram of Invariant Mass of Muon Pairs in Region I with Gaussian Fit')
 plt.legend()
 plt.show()
+'''
 
 
+gauss_hist = np.array([gauss_exp(x, *parameters) for x in bin_centers])
+
+plt.hist(gauss_hist, bins=100, density=True, histtype='step', label='Gaussian Fit Histogram', color='magenta')
+plt.hist(inv_mass_regionI, bins=100, density=True, histtype='step', label='Invariant Mass of Muon Pairs in Region I', color='cyan')
+plt.xlabel('Invariant Mass (GeV/c^2)')
+plt.ylabel('Normalized Number of Events')
+plt.title('Normalized Histogram of Invariant Mass of Muon Pairs in Region I with Gaussian Fit')
+plt.legend()
+plt.show()
