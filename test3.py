@@ -123,7 +123,9 @@ def norm_gauss(x, N, parameters):
 bin_centers = 0.5 * (bedges[:-1] + bedges[1:])
 
 
-N = 1/np.sum(norm_gauss(bin_centers, 1, parameters))  # Normalization factor
+N = 1/np.sum(entries)  # Normalization factor
+
+
 plt.hist(inv_mass_regionI/N, bins=100, density=True, histtype='step', label='Normalized Invariant Mass of Muon Pairs in Region I', color='cyan')
 plt.plot(bin_centers, norm_gauss(bin_centers, N, parameters), 'r--', label='Normalized Fitted Gaussian')
 plt.xlabel('Invariant Mass (GeV/c^2)')  
