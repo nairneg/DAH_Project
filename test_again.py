@@ -98,43 +98,34 @@ inv_mass_regionI = np.array([mass for mass in xmass if Ilower_bound <= mass <= I
 entries, bedges, ps = plt.hist(inv_mass_regionI, bins=100, histtype='step', label='Invariant Mass of Muon Pairs in Region I', color='cyan')
 plt.show()
 
-integral
 
-def gauss_exp(x, A, mu, sigma, B ,C):
-    return A * np.exp(- (x - mu)**2 / (2 * sigma**2)) + B * np.exp(-C * x)
-bin_centers = 0.5 * (bedges[:-1] + bedges[1:])
-p0 = [max(entries), bin_centers[np.argmax(entries)], 0.1, 4000000, 0.01]  # A, mu, sigma, B, C
+def gauss(x,  mu, sigma):
+    return  np.exp(- (x - mu)**2 / (2 * sigma**2))
 
+def exp(x):
+    return np.exp(-x)
 
-parameters, pcov = curve_fit(gauss_exp, bin_centers, entries, p0=p0)
-print(parameters)
+integral_A, errA = integrate.quad(gauss, Ilower_bound, Iupper_bound, args=[mu, sigma])
+NA = 1/ integral_A
 
+integral_B, errB = integrate.quad(exp, Ilower_bound, Iupper_bound)
+NB = 1/ integral_B  
 
-plt.hist(inv_mass_regionI, bins=100, histtype='step', label='Invariant Mass of Muon Pairs in Region I', color='cyan')
-plt.plot(bin_centers, gauss_exp(bin_centers, *parameters), 'r--', label='Fitted Gaussian')
-plt.xlabel('Invariant Mass (GeV/c^2)')
-plt.ylabel('Number of Events')
-plt.title('Histogram of Invariant Mass of Muon Pairs in Region I with Gaussian Fit')
-plt.legend()
-plt.show()
+def normalized_gauss(x, NA, mu, sigma):
+    return NA * np.exp(- (x - mu)**2 / (2 * sigma**2))     
 
-
-A, mu, sigma, B, C = parameters
+def normalized_exp(x, NB):
+    return NB * np.exp(-x)
 
 
+def comp_model(x, NA, mu, sigma, NB):
+    normal_gauss = normalized_gauss(x, NA, mu, sigma) + normalized_exp(x, NB)
+    normal_exp = normalized_exp(x, NB)
+    
+    return normal_gauss + normal_exp
 
-def gauss_exp_norm(x):
-    return np.exp(- (x - mu)**2 / (2 * sigma**2)) + np.exp(-C * x)
+p0 = [max(entries), bin_centers[np.argmax(entries)], 0.1, 4000000, 0.01]  # A, mu, sigma, B, C  
 
-Test = integrate.quad(lambda xx: gauss_exp_norm(xx),
-                      Ilower_bound, Iupper_bound)[0]
-print("Normalization check (should be 1): ", Test)
 
-test_array = np.linspace(Ilower_bound, Iupper_bound, 1000)
 
-plt.plot(test_array, gauss_exp_norm(test_array), label='Normalized (numeric)')
-plt.xlabel('Invariant Mass (GeV/c^2)')
-plt.ylabel('Probability Density')
-plt.title('Normalized Gaussian + Exponential Fit to Invariant Mass Data')
-plt.show()
 
