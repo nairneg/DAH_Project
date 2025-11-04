@@ -3,11 +3,12 @@ import numpy as np
 import scipy as sp
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
+from scipy import integrate
 
 
 # import data
 #xmass = np.loadtxt(sys.argv[1])
-f = open("C:/Users/K_muk/OneDrive - University of Edinburgh/Physics Year 4/Data Acquisition & Handling/DAH Project/ups-15-small.bin","r")
+f = open("ups-15-small.bin","r")
 datalist = np.fromfile(f,dtype=np.float32)
 
 # number of events
@@ -91,7 +92,7 @@ Ilower_bound = 9.3
 Iupper_bound = 9.6
 
 
-inv_mass_regionI = [mass for mass in xmass if Ilower_bound <= mass <= Iupper_bound]
+inv_mass_regionI = np.array([mass for mass in xmass if Ilower_bound <= mass <= Iupper_bound])
 
 
 entries, bedges, ps = plt.hist(inv_mass_regionI, bins=100, histtype='step', label='Invariant Mass of Muon Pairs in Region I', color='cyan')
@@ -107,6 +108,14 @@ parameters, pcov = curve_fit(gauss_exp, bin_centers, entries, p0=p0)
 print(parameters)
 
 
+integral = integrate.quad(gauss_exp, Ilower_bound, Iupper_bound, args=tuple(parameters))[0]
+N = 1 / integral  # Normalization factor based on integral of the fitted function
+
+
+def test(x, A, mu, sigma, B ,C, N):
+    return N * (A * np.exp(- (x - mu)**2 / (2 * sigma**2)) + B * np.exp(-C * x))
+
+
 plt.hist(inv_mass_regionI, bins=100, histtype='step', label='Invariant Mass of Muon Pairs in Region I', color='cyan')
 plt.plot(bin_centers, gauss_exp(bin_centers, *parameters), 'r--', label='Fitted Gaussian')
 plt.xlabel('Invariant Mass (GeV/c^2)')
@@ -115,21 +124,12 @@ plt.title('Histogram of Invariant Mass of Muon Pairs in Region I with Gaussian F
 plt.legend()
 plt.show()
 
-
-def norm_gauss(x, N, parameters):
-    A, mu, sigma, B, C = parameters
-    gauss = A * np.exp(- (x - mu)**2 / (2 * sigma**2)) + B * np.exp(-C * x)
-    return N * gauss
-bin_centers = 0.5 * (bedges[:-1] + bedges[1:])
-
-
-N = 1/np.sum(entries)  # Normalization factor
-
-
-plt.hist(inv_mass_regionI/N, bins=100, density=True, histtype='step', label='Normalized Invariant Mass of Muon Pairs in Region I', color='cyan')
-plt.plot(bin_centers, norm_gauss(bin_centers, N, parameters), 'r--', label='Normalized Fitted Gaussian')
-plt.xlabel('Invariant Mass (GeV/c^2)')  
-plt.ylabel('Normalized Number of Events')
-plt.title('Normalized Histogram of Invariant Mass of Muon Pairs in Region I with Gaussian Fit')
+plt.plot(bin_centers, test(bin_centers, *parameters, N), 'g-', label='Normalized Fit')
+#plt.hist(inv_mass_regionI, bins=100, histtype='step', label='Invariant Mass of Muon Pairs in Region I', color='cyan')
+plt.xlabel('Invariant Mass (GeV/c^2)')
+plt.ylabel('Number of Events')
+plt.title('Histogram of Invariant Mass of Muon Pairs in Region I with Gaussian Fit')
 plt.legend()
 plt.show()
+
+
