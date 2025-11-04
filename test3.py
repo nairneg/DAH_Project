@@ -29,7 +29,7 @@ def extract_variables(data):
 
 list_array = extract_variables(xdata)
 
-inv_mass = list_array[0]
+xmass = list_array[0]
 xpair_trans_mom = list_array[1]
 xrapidity = list_array[2]
 xpair_mom = list_array[3]
