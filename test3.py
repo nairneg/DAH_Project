@@ -36,7 +36,7 @@ xrapidity = list_array[2]
 xpair_mom = list_array[3]
 xfirst_mom = list_array[4]
 xsecond_mom = list_array[5]
-'''
+
 # plot histograms of variables
 plt.hist(xmass, bins=500, histtype='step', label='Invariant Mass of Muon Pairs')
 plt.xlabel('Invariant Mass (GeV/c^2)')
@@ -45,6 +45,7 @@ plt.xlim(min(xmass), max(xmass))
 plt.title('Histogram of Invariant Mass of Muon Pairs')
 plt.savefig('invariant_mass_histogram.svg', format='svg')
 plt.show()
+"""
 
 plt.hist(xpair_trans_mom, bins=500, histtype='step', label='Transverse Momentum of Muon Pairs', color='orange')
 plt.xlabel('Transverse Momentum (GeV/c)')
@@ -138,3 +139,4 @@ plt.ylabel('Probability Density')
 plt.title('Normalized Gaussian + Exponential Fit to Invariant Mass Data')
 plt.show()
 
+"""
