@@ -15,9 +15,6 @@ from iminuit import Minuit, describe
 
 from iminuit.cost import LeastSquares
 
-# Annotated and Gt are imported from iminuit.typing here for universal compatibility,
-# but users should in general import them from external packages `typing-extensions` and
-# `annotated-types` to decouple models from the `iminuit` package
 from iminuit.typing import Annotated, Gt
 
 
@@ -137,6 +134,18 @@ plt.title("Υ(1S) composite normalized fit")
 plt.legend()
 plt.show()
 
+model_vals = comp_model(bin_centers, mu_fit, sigma_fit, lamb_fit, f_s_fit)
+
+residuals = ydata - model_vals
+residualsd = (ydata - model_vals) / np.sqrt(ydata)
+
+plt.plot(bin_centers, residuals, 'o')
+plt.plot(bin_centers, residualsd, '+')
+plt.axhline(0, color='red', linestyle='--')     
+plt.xlabel("Invariant mass (GeV/c²)")
+plt.ylabel("Residuals")
+plt.title("Residuals of Fit to Υ(1S) Region")
+plt.show()        
 
 def testing(inv_mass_regionX):
     
@@ -228,10 +237,35 @@ except RuntimeError as e:
     m.limits = ((10.2, 10.5), (0.01, 0.2), (0.1, 10.0), (0.0, 1.0)) 
     m.migrad()
     m.hesse()
-    #print(m.values*1000)
 
     parameters3 = [m.values[k] for k in ["mu", "sigma", "lamb", "f_s"]]
-    pcov2 = np.diag([m.errors[k]**2 for k in ["mu", "sigma", "lamb", "f_s"]])
+    pcov3 = np.diag([m.errors[k]**2 for k in ["mu", "sigma", "lamb", "f_s"]])
+    
+    
+model_vals2 = comp_model(bin_centers, parameters2[0], parameters2[1], parameters2[2], parameters2[3])
+
+residuals2 = ydata2 - model_vals2
+residualsd2 = (ydata2 - model_vals2) / np.sqrt(ydata2)
+plt.plot(bin_centers, residuals2, 'o')
+plt.plot(bin_centers, residualsd2, '+')
+plt.axhline(0, color='red', linestyle='--')     
+plt.xlabel("Invariant mass (GeV/c²)")           
+plt.ylabel("Residuals")
+plt.title("Residuals of Fit to Υ(2S) Region")
+plt.show()
+
+
+model_vals3 = comp_model(bin_centers, parameters3[0], parameters3[1], parameters3[2], parameters3[3])
+
+residuals3 = ydata3 - model_vals3
+residualsd3 = (ydata3 - model_vals3) / np.sqrt(ydata3)
+plt.plot(bin_centers, residuals3, 'o')
+plt.plot(bin_centers, residualsd3, '+')
+plt.axhline(0, color='red', linestyle='--')     
+plt.xlabel("Invariant mass (GeV/c²)")           
+plt.ylabel("Residuals")
+plt.title("Residuals of Fit to Υ(3S) Region")
+plt.show()
     
 """
 
