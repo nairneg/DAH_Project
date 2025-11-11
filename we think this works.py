@@ -1,0 +1,276 @@
+from matplotlib.pylab import norm
+import numpy as np
+import matplotlib.pyplot as plt
+from pyparsing import line
+import scipy
+from scipy.optimize import curve_fit
+from scipy import integrate
+#from scipy.optimize import minimize
+import iminuit
+from iminuit import minimize  # has same interface as scipy.optimize.minimize
+from iminuit import Minuit, describe
+from iminuit.cost import LeastSquares
+from iminuit.typing import Annotated, Gt
+
+
+#print("iminuit version:", iminuit.__version__)
+# import data
+#xmass = np.loadtxt(sys.argv[1])
+f = open("ups-15-small.bin","r")
+datalist = np.fromfile(f,dtype=np.float32)
+
+# number of events
+nevent = int(len(datalist)/6)
+
+xdata = np.split(datalist,nevent)
+print(xdata[0])
+
+
+xdata = datalist.reshape(nevent, 6)
+
+# extract variable arrays
+
+def extract_variables(data):
+    """Extracts the 6 variable arrays (columns) from event data."""
+    list_array = [data[:, i] for i in range(data.shape[1])]
+    return list_array
+
+
+list_array = extract_variables(xdata)
+
+xmass = list_array[0]
+xpair_trans_mom = list_array[1]
+xrapidity = list_array[2]
+xpair_mom = list_array[3]
+xfirst_mom = list_array[4]
+xsecond_mom = list_array[5]
+
+
+
+Ilower_bound, Iupper_bound = 9.3, 9.6
+inv_mass_regionI = np.array([m for m in xmass if Ilower_bound <= m <= Iupper_bound])
+
+entries, bedges, _ = plt.hist(inv_mass_regionI, bins=100, color='cyan', label='Data')
+plt.xlabel("Invariant mass (GeV/c²)")
+plt.ylabel("Entries per bin")
+plt.xlim(9.3, 9.6)  
+plt.title("Υ(1S) region (data)")
+plt.legend()
+plt.show()
+
+bin_centers = 0.5 * (bedges[:-1] + bedges[1:])
+
+
+def normalized_gauss(x, mu, sigma, a, b):
+
+    integral, _ = integrate.quad(lambda xx: np.exp(-0.5*((xx - mu)/sigma)**2), a, b)
+    N = 1.0 /integral
+    return N * np.exp(-0.5 * ((x - mu)/sigma)**2)
+
+def normalized_exp(x, lamb, a, b):
+
+    if abs(lamb) < 1e-12: 
+        return np.full_like(x, 1/ (b - a))
+    integral, _ = integrate.quad(lambda xx: np.exp(-lamb * xx), a, b)
+    norm =  np.exp(-lamb*x) / integral
+    return norm
+
+# --- Composite model ---
+def comp_model(x, mu, sigma, lamb, f_s, a, b):
+    
+    return f_s * normalized_gauss(x, mu, sigma, a, b) + (1 - f_s) * normalized_exp(x, lamb, a, b)
+
+# --- Fit model to histogram (binned likelihood via curve_fit) ---
+# convert counts to densities
+ydata = entries / np.trapz(entries, bin_centers)
+
+# initial guesses: μ, σ, λ, f_s
+p0 = [9.46, 0.05, 2.0, 0.5]
+bounds = ([9.3, 0.01, 0.1, 0.0], [9.6, 0.2, 10.0, 1.0])
+
+parameters, pcov = curve_fit(lambda x, mu, sigma, lamb, f_s: comp_model(x, mu, sigma, lamb, f_s, Ilower_bound, Iupper_bound), bin_centers, ydata, p0=p0, bounds=bounds)
+errors = np.sqrt(np.diag(pcov))
+mu_fit, sigma_fit, lamb_fit, f_s_fit = parameters
+
+
+# define your negative log-likelihood function
+def nll(mu, sigma, lamb, f_s):
+    pdf_vals = comp_model(inv_mass_regionI, mu, sigma, lamb, f_s, Ilower_bound, Iupper_bound)
+    if np.any(pdf_vals <= 0):
+        return 1e10
+    return -np.sum(np.log(pdf_vals))
+
+
+
+# initial guesses
+m = Minuit(nll, mu=9.46, sigma=0.05, lamb=2.0, f_s=0.5)
+m.limits = ((9.3, 9.6), (0.01, 0.2), (0.1, 10.0), (0.0, 1.0))
+m.migrad()   # run the minimizer
+m.hesse()    # compute errors
+
+print(m.values[0])  # best-fit parameters
+print(m.errors[0])
+
+
+print(f"μ = {mu_fit:.4f} GeV")
+print(f"σ = {sigma_fit:.4f} GeV")
+print(f"λ = {lamb_fit:.3f} GeV⁻¹")
+print(f"f_s = {f_s_fit:.3f}")
+
+plt.hist(inv_mass_regionI, bins=100, density=True, color='cyan', label='Data')
+m_plot = np.linspace(Ilower_bound, Iupper_bound, 500)
+plt.plot(m_plot, comp_model(m_plot, mu_fit, sigma_fit, lamb_fit, f_s_fit, Ilower_bound, Iupper_bound),
+         'black', label='Gaussian + Exponential (fit)')
+plt.xlabel("Invariant mass (GeV/c²)")
+plt.ylabel("Probability density")
+plt.title("Υ(1S) composite normalized fit")
+plt.xlim(9.3, 9.6)  
+plt.legend()
+plt.show()
+
+model_vals = comp_model(bin_centers, mu_fit, sigma_fit, lamb_fit, f_s_fit, Ilower_bound, Iupper_bound)
+
+residuals = ydata - model_vals
+residualsd = (ydata - model_vals) / np.sqrt(ydata)
+
+plt.plot(bin_centers, residuals, 'o', label='Residuals')
+#plt.plot(bin_centers, residualsd, '+', label='Normalized Residuals')
+plt.axhline(0, color='black', linestyle='--')     
+plt.xlabel("Invariant mass (GeV/c²)")
+plt.ylabel("Residuals")
+plt.title("Residuals of Fit to Υ(1S) Region")
+plt.legend()
+plt.show()        
+
+def testing(inv_mass_regionX, lims):
+    
+    entries, bedges, _ = plt.hist(inv_mass_regionX, bins=100,  color='cyan', label='Data')
+    plt.xlabel("Invariant mass (GeV/c²)")
+    plt.ylabel("Entries per bin")
+    plt.title("Υ(1S) region (data)")
+    plt.xlim(lims[0], lims[1])
+    plt.legend()
+    plt.show()
+    bin_centers = 0.5 * (bedges[:-1] + bedges[1:])
+
+    norm = np.trapz(entries, bin_centers)
+    if norm == 0:
+        ydata = entries
+    else:
+        ydata = entries / norm
+
+    #ydata = entries / np.trapz(entries, bin_centers)
+    return ydata, bin_centers
+
+area, error = integrate.quad(lambda xx: comp_model(xx, mu_fit, sigma_fit, lamb_fit, f_s_fit, Ilower_bound, Iupper_bound), Ilower_bound, Iupper_bound)
+print(f"Composite PDF integral = {area} ± {error}")
+
+
+
+Ilower_bound_P2, Iupper_bound_P2 = 9.9, 10.1
+inv_mass_regionII = np.array([mass for mass in xmass if Ilower_bound_P2 <= mass <= Iupper_bound_P2])
+
+
+entries2, bedges2, p2 = plt.hist(inv_mass_regionII, bins=100, color='cyan', label='Data')
+plt.xlabel("Invariant mass (GeV/c²)")
+plt.ylabel("Entries per bin")
+plt.xlim(9.9, 10.1)  
+plt.title("Υ(2S) region (data)")
+plt.legend()
+plt.show()
+
+bin_centers2 = 0.5 * (bedges2[:-1] + bedges2[1:])
+ydata2 = entries2 / np.trapz(entries2, bin_centers2)
+
+p02= [10.01, 0.05, 2.0, 0.5]
+bounds2 = ([9.9, 0.01, 0.1, 0.0], [10.1, 0.2, 10.0, 1.0])
+
+parameters2, pcov2 = curve_fit(lambda x, mu, sigma, lamb, f_s: comp_model(x, mu, sigma, lamb, f_s, Ilower_bound_P2, Iupper_bound_P2), bin_centers2, ydata2, p0=p02, bounds=bounds2)
+errors2 = np.sqrt(np.diag(pcov2))
+mu_fit2, sigma_fit2, lamb_fit2, f_s_fit2 = parameters2
+
+
+print(f"μ = {mu_fit2:.4f} GeV")
+print(f"σ = {sigma_fit2:.4f} GeV")
+print(f"λ = {lamb_fit2:.3f} GeV⁻¹")
+print(f"f_s = {f_s_fit2:.3f}")
+
+plt.hist(inv_mass_regionII, bins=100, density=True, color='cyan', label='Data')
+m_plot2 = np.linspace(Ilower_bound_P2, Iupper_bound_P2, 500)
+plt.plot(m_plot2, comp_model(m_plot2, mu_fit2, sigma_fit2, lamb_fit2, f_s_fit2, Ilower_bound_P2, Iupper_bound_P2),
+         'black', label='Gaussian + Exponential (fit)')
+plt.xlabel("Invariant mass (GeV/c²)")
+plt.ylabel("Probability density")
+plt.title("Υ(2S) composite normalized fit")
+plt.xlim(9.9, 10.1)  
+plt.legend()
+plt.show()
+
+model_vals2 = comp_model(bin_centers2, mu_fit2, sigma_fit2, lamb_fit2, f_s_fit2, Ilower_bound_P2, Iupper_bound_P2)
+
+residuals2 = ydata2 - model_vals2
+residualsd2 = (ydata2 - model_vals2) / np.sqrt(ydata2)
+
+plt.plot(bin_centers2, residuals2, 'o', label='Residuals')
+#plt.plot(bin_centers2, residualsd2, '+', label='Normalized Residuals')
+plt.axhline(0, color='black', linestyle='--')     
+plt.xlabel("Invariant mass (GeV/c²)")
+plt.ylabel("Residuals")
+plt.title("Residuals of Fit to Υ(2S) Region")
+plt.legend()
+plt.show()   
+
+
+
+Ilower_bound_P3, Iupper_bound_P3 = 10.3, 10.5
+inv_mass_regionIII = np.array([mass for mass in xmass if Ilower_bound_P3 <= mass <= Iupper_bound_P3])
+
+
+entries3, bedges3, p3 = plt.hist(inv_mass_regionIII, bins=100, color='cyan', label='Data')
+plt.xlabel("Invariant mass (GeV/c²)")
+plt.ylabel("Entries per bin")
+plt.xlim(10.3, 10.5)  
+plt.title("Υ(3S) region (data)")
+plt.legend()
+plt.show()
+
+bin_centers3 = 0.5 * (bedges3[:-1] + bedges3[1:])
+ydata3 = entries3 / np.trapz(entries3, bin_centers3)
+
+p03 = [10.35, 0.05, 2.0, 0.5]  
+bounds3= ([10.2, 0.01, 0.1, 0.0], [10.5, 0.2, 10.0, 1.0])
+
+
+parameters3, pcov3 = curve_fit(lambda x, mu, sigma, lamb, f_s: comp_model(x, mu, sigma, lamb, f_s, Ilower_bound_P3, Iupper_bound_P3), bin_centers3, ydata3, p0=p03, bounds=bounds3)
+errors3 = np.sqrt(np.diag(pcov3))
+mu_fit3, sigma_fit3, lamb_fit3, f_s_fit3 = parameters3
+
+
+print(f"μ = {mu_fit3:.4f} GeV")
+print(f"σ = {sigma_fit3:.4f} GeV")
+print(f"λ = {lamb_fit3:.3f} GeV⁻¹")
+print(f"f_s = {f_s_fit3:.3f}")
+
+plt.hist(inv_mass_regionIII, bins=100, density=True, color='cyan', label='Data')
+m_plot3 = np.linspace(Ilower_bound_P3, Iupper_bound_P3, 500)
+plt.plot(m_plot3, comp_model(m_plot3, mu_fit3, sigma_fit3, lamb_fit3, f_s_fit3, Ilower_bound_P3, Iupper_bound_P3),
+         'black', label='Gaussian + Exponential (fit)')
+plt.xlabel("Invariant mass (GeV/c²)")
+plt.ylabel("Probability density")
+plt.title("Υ(3S) composite normalized fit")
+plt.xlim(10.3, 10.5)  
+plt.legend()
+plt.show()
+
+model_vals3 = comp_model(bin_centers3, mu_fit3, sigma_fit3, lamb_fit3, f_s_fit3, Ilower_bound_P3, Iupper_bound_P3)
+residuals3 = ydata3 - model_vals3
+residualsd3 = (ydata3 - model_vals3) / np.sqrt(ydata3)
+
+plt.plot(bin_centers3, residuals3, 'o', label='Residuals')
+#plt.plot(bin_centers3, residualsd3, '+', label='Normalized Residuals')
+plt.axhline(0, color='black', linestyle='--')     
+plt.xlabel("Invariant mass (GeV/c²)")
+plt.ylabel("Residuals")
+plt.title("Residuals of Fit to Υ(3S) Region")
+plt.legend()
+plt.show()   
