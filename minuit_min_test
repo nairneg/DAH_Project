@@ -7,21 +7,13 @@ from scipy.optimize import curve_fit
 from scipy import integrate
 #from scipy.optimize import minimize
 import iminuit
-
-
-
 from iminuit import minimize  # has same interface as scipy.optimize.minimize
 from iminuit import Minuit, describe
-
 from iminuit.cost import LeastSquares
-
 from iminuit.typing import Annotated, Gt
 
 
-print("iminuit version:", iminuit.__version__)
-
-
-
+#print("iminuit version:", iminuit.__version__)
 # import data
 #xmass = np.loadtxt(sys.argv[1])
 f = open("ups-15-small.bin","r")
@@ -58,9 +50,10 @@ xsecond_mom = list_array[5]
 Ilower_bound, Iupper_bound = 9.3, 9.6
 inv_mass_regionI = np.array([m for m in xmass if Ilower_bound <= m <= Iupper_bound])
 
-entries, bedges, _ = plt.hist(inv_mass_regionI, bins=100, histtype='step', color='cyan', label='Data')
+entries, bedges, _ = plt.hist(inv_mass_regionI, bins=100, color='cyan', label='Data')
 plt.xlabel("Invariant mass (GeV/c²)")
 plt.ylabel("Entries per bin")
+plt.xlim(9.3, 9.6)  
 plt.title("Υ(1S) region (data)")
 plt.legend()
 plt.show()
@@ -117,20 +110,21 @@ m.hesse()    # compute errors
 
 print(m.values[0])  # best-fit parameters
 print(m.errors[0])
-"""
-"""
+
+
 print(f"μ = {mu_fit:.4f} GeV")
 print(f"σ = {sigma_fit:.4f} GeV")
 print(f"λ = {lamb_fit:.3f} GeV⁻¹")
 print(f"f_s = {f_s_fit:.3f}")
 
-plt.hist(inv_mass_regionI, bins=100, density=True, histtype='step', color='cyan', label='Data')
+plt.hist(inv_mass_regionI, bins=100, density=True, color='cyan', label='Data')
 m_plot = np.linspace(Ilower_bound, Iupper_bound, 500)
 plt.plot(m_plot, comp_model(m_plot, mu_fit, sigma_fit, lamb_fit, f_s_fit),
-         'r-', label='Gaussian + Exponential (fit)')
+         'black', label='Gaussian + Exponential (fit)')
 plt.xlabel("Invariant mass (GeV/c²)")
 plt.ylabel("Probability density")
 plt.title("Υ(1S) composite normalized fit")
+plt.xlim(9.3, 9.6)  
 plt.legend()
 plt.show()
 
@@ -147,12 +141,13 @@ plt.ylabel("Residuals")
 plt.title("Residuals of Fit to Υ(1S) Region")
 plt.show()        
 
-def testing(inv_mass_regionX):
+def testing(inv_mass_regionX, lims):
     
-    entries, bedges, _ = plt.hist(inv_mass_regionX, bins=100, histtype='step', color='cyan', label='Data')
+    entries, bedges, _ = plt.hist(inv_mass_regionX, bins=100,  color='cyan', label='Data')
     plt.xlabel("Invariant mass (GeV/c²)")
     plt.ylabel("Entries per bin")
     plt.title("Υ(1S) region (data)")
+    plt.xlim(lims[0], lims[1])
     plt.legend()
     plt.show()
     bin_centers = 0.5 * (bedges[:-1] + bedges[1:])
@@ -174,15 +169,15 @@ inv_mass_regionII = np.array([mass for mass in xmass if Ilower_bound_P2 <= mass 
 Ilower_bound_P3, Iupper_bound_P3 = 10.2, 10.5
 inv_mass_regionIII = np.array([mass for mass in xmass if Ilower_bound_P3 <= mass <= Iupper_bound_P3])
 
-# --- Define a region-specific model ---
+
 def comp_model_region2(x, mu, sigma, lamb, f_s):
     return comp_model(x, mu, sigma, lamb, f_s, a=Ilower_bound_P2, b=Iupper_bound_P2)
 
-# --- Try curve_fit with more evaluations ---
+
 try:
     parameters2, pcov2 = curve_fit(
         comp_model_region2,
-        *testing(inv_mass_regionII)[::-1],  # bc2, ydata2
+        *testing(inv_mass_regionII, lims=[Ilower_bound_P2, Iupper_bound_P2])[::-1],  # bc2, ydata2
         p0=[10.01, 0.05, 2.0, 0.5],
         bounds=([9.9, 0.01, 0.1, 0.0], [10.1, 0.2, 10.0, 1.0]),
         maxfev=2000 )
@@ -202,14 +197,13 @@ except RuntimeError as e:
     m.limits = ((9.9, 10.1), (0.01, 0.2), (0.1, 10.0), (0.0, 1.0))
     m.migrad()
     m.hesse()
-    #print(m.values*1000)
+
 
     parameters2 = [m.values[k] for k in ["mu", "sigma", "lamb", "f_s"]]
     pcov2 = np.diag([m.errors[k]**2 for k in ["mu", "sigma", "lamb", "f_s"]])
 
 
 
-# --- Define a region-specific model ---
 def comp_model_region2(x, mu, sigma, lamb, f_s):
     return comp_model(x, mu, sigma, lamb, f_s, a=Ilower_bound_P2, b=Iupper_bound_P3)
 
@@ -217,7 +211,7 @@ def comp_model_region2(x, mu, sigma, lamb, f_s):
 try:
     parameters3, pcov3 = curve_fit(
         comp_model_region2,
-        *testing(inv_mass_regionIII)[::-1],  # bc3, ydata3
+        *testing(inv_mass_regionIII, lims=[Ilower_bound_P3, Iupper_bound_P3])[::-1],  # bc3, ydata3
         p0=[10.35 , 0.05, 2.0, 0.5],
         bounds=([10.2, 0.01, 0.1, 0.0], [10.5, 0.2, 10.0, 1.0]),
         maxfev=2000 )
@@ -241,7 +235,20 @@ except RuntimeError as e:
     parameters3 = [m.values[k] for k in ["mu", "sigma", "lamb", "f_s"]]
     pcov3 = np.diag([m.errors[k]**2 for k in ["mu", "sigma", "lamb", "f_s"]])
     
+
+
+plt.hist(inv_mass_regionII, bins=100, density=True, color='cyan', label='Data')
+m_plot = np.linspace(Ilower_bound_P2, Iupper_bound_P2, 500)
+plt.plot(m_plot, comp_model(m_plot, parameters2[0], parameters2[1], parameters2[2], parameters2[3]),
+         'black', label='Gaussian + Exponential (fit)')
+plt.xlabel("Invariant mass (GeV/c²)")
+plt.ylabel("Probability density")
+plt.title("Υ(2S) composite normalized fit")
+#plt.xlim(Ilower_bound_P2, Iupper_bound_P2)
+plt.legend()
+plt.show()
     
+ydata2, bin_centers = testing(inv_mass_regionII, lims=[Ilower_bound_P2, Iupper_bound_P2])
 model_vals2 = comp_model(bin_centers, parameters2[0], parameters2[1], parameters2[2], parameters2[3])
 
 residuals2 = ydata2 - model_vals2
@@ -255,7 +262,24 @@ plt.title("Residuals of Fit to Υ(2S) Region")
 plt.show()
 
 
+ydata3, bin_centers = testing(inv_mass_regionIII, lims=[Ilower_bound_P3, Iupper_bound_P3])
 model_vals3 = comp_model(bin_centers, parameters3[0], parameters3[1], parameters3[2], parameters3[3])
+
+plt.hist(inv_mass_regionIII, bins=100, density=True, color='cyan', label='Data')
+m_plot = np.linspace(Ilower_bound_P3, Iupper_bound_P3, 500)
+plt.plot(m_plot, comp_model(m_plot, parameters3[0], parameters3[1], parameters3[2], parameters3[3]),
+         'black', label='Gaussian + Exponential (fit)')
+plt.xlabel("Invariant mass (GeV/c²)")
+plt.ylabel("Probability density")
+plt.title("Υ(3S) composite normalized fit")
+#plt.xlim(Ilower_bound_P3, Iupper_bound_P3)
+plt.legend()
+plt.show()
+
+
+
+
+
 
 residuals3 = ydata3 - model_vals3
 residualsd3 = (ydata3 - model_vals3) / np.sqrt(ydata3)
