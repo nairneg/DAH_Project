@@ -12,6 +12,7 @@ from iminuit import Minuit, describe
 from iminuit.cost import LeastSquares
 from iminuit.typing import Annotated, Gt
 from scipy.stats import crystalball
+from scipy.special import erf
 
 #print("iminuit version:", iminuit.__version__)
 # import data
@@ -207,7 +208,7 @@ plt.legend()
 plt.show()
 
 model_vals2 = comp_model(bin_centers2, mu_fit2, sigma_fit2, lamb_fit2, f_s_fit2, Ilower_bound_P2, Iupper_bound_P2)
-
+"""
 residuals2 = ydata2 - model_vals2
 residualsd2 = (ydata2 - model_vals2) / np.sqrt(ydata2)
 
@@ -219,7 +220,7 @@ plt.ylabel("Residuals")
 plt.title("Residuals of Fit to Υ(2S) Region")
 plt.legend()
 plt.show()   
-
+"""
 
 
 Ilower_bound_P3, Iupper_bound_P3 = 10.2, 10.5
@@ -262,9 +263,11 @@ plt.xlim(10.2, 10.5)
 plt.legend()
 plt.show()
 
+"""
 model_vals3 = comp_model(bin_centers3, mu_fit3, sigma_fit3, lamb_fit3, f_s_fit3, Ilower_bound_P3, Iupper_bound_P3)
 residuals3 = ydata3 - model_vals3
 residualsd3 = (ydata3 - model_vals3) / np.sqrt(ydata3)
+
 
 plt.plot(bin_centers3, residuals3, 'o', label='Residuals')
 #plt.plot(bin_centers3, residualsd3, '+', label='Normalized Residuals')
@@ -275,13 +278,53 @@ plt.title("Residuals of Fit to Υ(3S) Region")
 plt.legend()
 plt.show()   
 
-
-def crystal_ball(x, beta, m):
-
-    TT = crystalball.pdf(x, beta, m)
-    return TT
+"""
 
 
-TEST, TEST2 = crystal_ball(bin_centers3, mu_fit3, sigma_fit3)
-print(TEST)
-print(TEST2)
+
+from scipy.special import erf
+from scipy import stats
+
+
+
+def crystal_ball(x, alpha, n, xbar, sigma):
+    """Compute the Crystal Ball function (normalized)."""
+    n_over_alpha = n / abs(alpha)
+    exp = np.exp(-0.5 * alpha**2)
+    A = (n_over_alpha)**n * exp
+    B = n_over_alpha - abs(alpha)
+    C = n_over_alpha / (n - 1) * exp
+    D = np.sqrt(0.5 * np.pi) * (1 + erf(abs(alpha) / np.sqrt(2)))
+    N = 1 / (sigma * (C + D))
+
+    mask = (x - xbar) / sigma > -alpha
+    result = np.zeros_like(x)
+    result[mask] = N * np.exp(-0.5 * ((x[mask] - xbar) / sigma) ** 2)
+    result[~mask] = N * A * (B - (x[~mask] - xbar) / sigma) ** -n
+
+    # Ensure total area = 1
+    result /= np.trapz(result, x)
+    return result, mask
+
+
+# --- Example usage ---
+alpha = 6
+n = 10
+mu = 9.45
+sigma = 0.05
+
+
+ns = [2,3,4,5,6,7,8,9,10]
+
+for n in ns:
+
+    x_sorted = np.sort(inv_mass_regionI)
+    y, mask = crystal_ball(x_sorted, alpha, n, mu, sigma)
+
+    plt.hist(inv_mass_regionI, bins=100, density=True, alpha=0.5, label="Data", color='cyan')
+    plt.plot(x_sorted, y, color='black', lw=2, label=f"Crystal Ball fit, n={n}" )
+    plt.xlabel("Invariant mass (GeV/c²)")
+    plt.ylabel("Probability density")
+    plt.title("Υ(1S) Region with Crystal Ball Model")
+    plt.legend()
+    plt.show()
