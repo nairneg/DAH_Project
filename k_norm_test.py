@@ -4,8 +4,8 @@ import scipy as sp
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 from scipy import integrate
-from math import sqrt, pi, erf, exp
-
+from scipy.stats import exponnorm
+from scipy.special import erfc
 
 # import data
 #xmass = np.loadtxt(sys.argv[1])
@@ -99,10 +99,11 @@ inv_mass_regionI = np.array([mass for mass in xmass if Ilower_bound <= mass <= I
 entries, bedges, ps = plt.hist(inv_mass_regionI, bins=100, histtype='step', label='Invariant Mass of Muon Pairs in Region I', color='cyan')
 plt.show()
 
-def gauss_exp(x, A, mu, sigma, B ,C):
-    return A * np.exp(- (x - mu)**2 / (2 * sigma**2)) + B * np.exp(-C * x)
+def gauss_exp(x, mu, sigma, lam, A):
+    return A * np.exp(- (x - mu)**2 / (2 * sigma**2)) + np.exp(lam * x)
+    
 bin_centers = 0.5 * (bedges[:-1] + bedges[1:])
-p0 = [max(entries), bin_centers[np.argmax(entries)], 0.1, 4000000, 0.01]  # A, mu, sigma, B, C
+p0 = [bin_centers[np.argmax(entries)], 0.1, - 0.01, max(entries)]  # mu, sigma, lam initial guesses
 
 
 parameters, pcov = curve_fit(gauss_exp, bin_centers, entries, p0=p0)
@@ -117,21 +118,16 @@ plt.title('Histogram of Invariant Mass of Muon Pairs in Region I with Gaussian F
 plt.legend()
 plt.show()
 
-
-A, mu, sigma, B, C = parameters
-
+mu, sigma, lam, A = parameters
 
 
-def gauss_exp_norm(x):
-    return np.exp(- (x - mu)**2 / (2 * sigma**2)) + np.exp(-C * x)
+def gauss_exp_norm_PDF(x):
+    return lam/2 * np.exp(lam/2 * (2*mu + lam*sigma**2 - 2*x)) * erfc((mu + lam*sigma**2 - x)/(np.sqrt(2)*sigma))
 
-Test = integrate.quad(lambda xx: gauss_exp_norm(xx),
-                      Ilower_bound, Iupper_bound)[0]
-print("Normalization check (should be 1): ", Test)
+Test = integrate.quad(gauss_exp_norm_PDF, Ilower_bound, Iupper_bound)
+print("Normalization check (should be close to 1):", Test[0])
 
-test_array = np.linspace(Ilower_bound, Iupper_bound, 1000)
-
-plt.plot(test_array, gauss_exp_norm(test_array), label='Normalized (numeric)')
+plt.plot(bin_centers, gauss_exp_norm_PDF(bin_centers), label='Normalized (numeric)')
 plt.xlabel('Invariant Mass (GeV/c^2)')
 plt.ylabel('Probability Density')
 plt.title('Normalized Gaussian + Exponential Fit to Invariant Mass Data')
