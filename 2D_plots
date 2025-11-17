@@ -75,4 +75,4 @@ variables = [
 for Y, ylabel, title in variables:
     twoD_plotter(xmass, Y, "Invariant Mass [GeV]", ylabel, title)
     
-Purity = need to figure out
+#Purity = need to figure out

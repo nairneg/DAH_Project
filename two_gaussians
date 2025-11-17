@@ -1,0 +1,170 @@
+from iminuit import Minuit
+import numpy as np
+from scipy.special import erf
+
+import numpy as np
+import matplotlib.pyplot as plt
+# ---------------------------------------------------
+# 1) Double Gaussian PDF
+# ---------------------------------------------------
+
+def double_gaussian_pdf(x, f, mu, sigma1, sigma2):
+    x = np.asarray(x, dtype=float)
+
+    G1 = np.exp(-0.5*((x - mu)/sigma1)**2) / (np.sqrt(2*np.pi)*sigma1)
+    G2 = np.exp(-0.5*((x - mu)/sigma2)**2) / (np.sqrt(2*np.pi)*sigma2)
+
+    return f*G1 + (1-f)*G2
+
+
+# ---------------------------------------------------
+# 2) NLL with parameter transforms
+# ---------------------------------------------------
+
+def nll_double_gauss(params, data):
+    a, mu, log_s1, log_s2, lamb, A, b   = params
+
+    # Transforms to keep parameters physical
+    f = 1/(1+np.exp(-a))           # 0 < f < 1
+    sigma1 = np.exp(log_s1)        # >0
+    sigma2 = np.exp(log_s2)        # >0
+    
+
+    pdf_vals = double_gaussian_pdf(data, f, mu, sigma1, sigma2)
+    pdf_vals = pdf_vals + 1e-300   # avoid log(0)
+
+    return -np.sum(np.log(pdf_vals))
+
+
+# ---------------------------------------------------
+# 3) Data loading (your file_read + extract_variables)
+# ---------------------------------------------------
+
+def file_read(f_path):
+    f_open = open(f_path,"r") 
+    datalist = np.fromfile(f_open, dtype=np.float32)
+    nevent = int(len(datalist) / 6)
+    xdata = datalist.reshape(nevent, 6)
+    return xdata
+
+def extract_variables(data):
+    return [data[:, i] for i in range(data.shape[1])]
+
+
+# Load data
+f_mc = '/Users/nairnegillespie/Desktop/Year 4/DAH Project/mc.bin' #monte carlo data
+xdata_mc = file_read(f_mc)
+xmass_mc, xpt_mc, rap_mc, p_mc, p1_mc, p2_mc = extract_variables(xdata_mc)
+# Choose the mass variable as the dataset to fit
+data = xmass_mc
+
+
+# ---------------------------------------------------
+# 4) Minuit interface wrapper
+# ---------------------------------------------------
+
+def nll_for_minuit(a, mu, log_s1, log_s2, lamb, A, b):
+    return nll_double_gauss([a, mu, log_s1, log_s2, lamb, A, b], data)
+
+
+# ---------------------------------------------------
+# 5) Run the fit
+# ---------------------------------------------------
+
+# Initial guesses
+m = Minuit(
+    nll_for_minuit,
+    a=0,
+    mu=np.mean(data),
+    log_s1=np.log(np.std(data)/2),
+    log_s2=np.log(np.std(data)*2), 
+    lamb=0, 
+    A=0, 
+    b=10.0
+)
+
+m.errordef = 0.5  # log-likelihood fit
+m.migrad(ncall=5000)
+m.hesse()
+
+# Extract results
+a = m.values["a"]
+f = 1/(1+np.exp(-a))
+mu = m.values["mu"]
+sigma1 = np.exp(m.values["log_s1"])
+sigma2 = np.exp(m.values["log_s2"])
+lamb = m.values["lamb"]
+A = m.values["A"]
+b = m.values["b"]
+
+print(f"Fit results:")
+print(f"  f       = {f}")
+print(f"  mu      = {mu}")
+print(f"  sigma1  = {sigma1}")
+print(f"  sigma2  = {sigma2}")
+print(f"  lamb    = {m.values['lamb']}")
+print(f"  a       = {m.values['a']}")
+print(f"  b       = {m.values['b']}")
+
+# ---------------------------------------------------
+# After your fit results are obtained:
+# f, mu, sigma1, sigma2 are already defined
+# data = xmass_small or xmass
+# ---------------------------------------------------
+
+# Rebuild the PDF with the fitted parameters
+def double_gaussian_pdf(x, f, mu, sigma1, sigma2, lamb, a, b):
+    G1 = np.exp(-0.5*((x - mu)/sigma1)**2) / (np.sqrt(2*np.pi)*sigma1)
+    G2 = np.exp(-0.5*((x - mu)/sigma2)**2) / (np.sqrt(2*np.pi)*sigma2)
+    return (f*G1 + (1-f)*G2 ) * normalized_exp(x, lamb, a, b)
+
+
+
+def normalized_exp(x, lamb, a, b):
+    # Normalized exponential on [a,b]
+    Z = 1 - np.exp(-lamb * (b - a))
+    return (lamb * np.exp(-lamb * (x - a))) / Z
+
+
+# ---------------------------
+# Prepare histogram
+# ---------------------------
+nbins = 500
+hist_vals, bin_edges = np.histogram(data, bins=nbins)
+
+bin_centers = 0.5*(bin_edges[1:] + bin_edges[:-1])
+bin_width = bin_edges[1] - bin_edges[0]
+bin_centers_mc = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+
+# ---------------------------
+# Evaluate fitted PDF on fine grid
+# ---------------------------
+x_plot = np.linspace(bin_edges[0], bin_edges[-1], 1000)
+pdf_vals = double_gaussian_pdf(bin_centers_mc, f, mu, sigma1, sigma2, lamb, A, b)
+
+# Normalize PDF to histogram counts
+pdf_scaled = pdf_vals * len(data) * bin_width
+
+
+# ---------------------------
+# Plot
+# ---------------------------
+plt.figure(figsize=(10,6))
+
+# histogram
+plt.hist(data, bins=nbins, alpha=0.4, color="steelblue",
+         label="Data (histogram)")
+
+# fitted curve
+plt.plot(bin_centers_mc, pdf_scaled, 'r-', linewidth=2.5,
+         label="Double Gaussian Fit")
+
+# labels
+plt.xlabel("Mass")
+plt.ylabel("Counts")
+plt.title("Double Gaussian Fit to Mass Spectrum")
+plt.legend()
+
+plt.grid(alpha=0.3)
+plt.show()
+

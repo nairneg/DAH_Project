@@ -1,66 +1,283 @@
-from matplotlib.pylab import beta, norm
 import numpy as np
 import matplotlib.pyplot as plt
-from pyparsing import line
 import scipy
-from scipy.optimize import curve_fit
-from scipy import integrate
-#from scipy.optimize import minimize
-import iminuit
-from iminuit import minimize  # has same interface as scipy.optimize.minimize
-from iminuit import Minuit, describe
-from iminuit.cost import LeastSquares
-from iminuit.typing import Annotated, Gt
-from scipy.stats import crystalball
+from scipy.optimize import minimize
 from scipy.special import erf
-
-#print("iminuit version:", iminuit.__version__)
-# import data
-#xmass = np.loadtxt(sys.argv[1])
-f = open('/Users/nairnegillespie/Desktop/Year 4/DAH Project/mc.bin',"r")
-datalist = np.fromfile(f,dtype=np.float32)
-
-# number of events
-nevent = int(len(datalist)/6)
-
-xdata = np.split(datalist,nevent)
-print(xdata[0])
+from scipy.integrate import quad
+from scipy.optimize import curve_fit
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
+from scipy.stats import crystalball
 
 
-xdata = datalist.reshape(nevent, 6)
+def file_read(f_path):
+    """
+    Reads in binary data from file and transforms it into a 2D numpy array. With columns representing different observables.
+    """
+    f_open = open(f_path,"r") 
+    datalist = np.fromfile(f_open, dtype=np.float32)
+    
+    nevent = int(len(datalist) / 6)
+    xdata = datalist.reshape(nevent, 6)
+    return xdata
 
-# extract variable arrays
+f_mc = '/Users/nairnegillespie/Desktop/Year 4/DAH Project/mc.bin' #monte carlo data
+xdata_mc = file_read(f_mc)
+
+f_small = '/Users/nairnegillespie/Desktop/Year 4/DAH Project/ups-15-small.bin' #smaller file of real data from LHCb for testing
+xdata_small = file_read(f_small)
 
 def extract_variables(data):
-    """Extracts the 6 variable arrays (columns) from event data."""
-    list_array = [data[:, i] for i in range(data.shape[1])]
-    return list_array
+    """
+    Extracts the 6 observable arrays (columns) from 2D array.
+    """
+    return [data[:, i] for i in range(data.shape[1])]
+
+xmass, xpt, rap, p, p1, p2 = extract_variables(xdata_mc)
+xmass_small, xpt_small, rap_small, p_small, p1_small, p2_small = extract_variables(xdata_small)
+
+entries_mc, bedges_mc, _ = plt.hist(xmass, bins=500, range=(9.0, 11.0), color='blue', alpha=0.5, label='MC Data')
+entries_small, bedges_small, _ = plt.hist(xmass_small, bins=500, range=(9.0, 11.0), color='orange', alpha=0.5, label='Small Real Data')
+
+bin_centers_mc = 0.5 * (bedges_mc[:-1] + bedges_mc[1:])
+bin_centers_small = 0.5 * (bedges_small[:-1] + bedges_small[1:])
 
 
-list_array = extract_variables(xdata)
+##########################################################
+# --- CRYSTAL BALL PDF (unnormalised) ---
+##########################################################
 
-xmass = list_array[0]
-xpair_trans_mom = list_array[1]
-xrapidity = list_array[2]
-xpair_mom = list_array[3]
-xfirst_mom = list_array[4]
-xsecond_mom = list_array[5]
+def crystal_ball(x, alpha, n, mu, sigma):
+    x = np.asarray(x)
+    t = (x - mu) / sigma
+    a = abs(alpha)
+
+    A = (n/a)**n * np.exp(-0.5 * a**2)
+    B = (n/a) - a
+
+    y = np.zeros_like(x)
+    mask = t > -a
+
+    y[mask] = np.exp(-0.5 * t[mask]**2)
+    y[~mask] = A * (B - t[~mask])**(-n)
+
+    return y
 
 
 
-Ilower_bound, Iupper_bound = 9.3, 9.6
-inv_mass_regionI = np.array([m for m in xmass if Ilower_bound <= m <= Iupper_bound])
+# ---------------------------------------------------
+# 1) Define the Crystal Ball PDF wrapper
+# ---------------------------------------------------
+def new_crystal_ball(x, alpha, n, mu, sigma):
+    """Return normalized PDF values"""
+    return crystalball.pdf(x, beta=alpha, m=n, loc=mu, scale=sigma)
+
+# ---------------------------------------------------
+# 2) Histogram your data
+# ---------------------------------------------------
+# xmass_mc = your MC mass array
+# For example:
+# xmass_mc = np.random.normal(9.46, 0.035, size=10000)  # placeholder
+
+nbins = 500
+hist_range = (9.0, 11.0)
+
+entries_mc, bin_edges_mc = np.histogram(xmass, bins=nbins, range=hist_range)
+bin_centers_mc = 0.5 * (bin_edges_mc[1:] + bin_edges_mc[:-1])
+bin_width = bin_edges_mc[1] - bin_edges_mc[0]
+
+# ---------------------------------------------------
+# 3) Fit using curve_fit with bounds and initial guesses
+# ---------------------------------------------------
+p0 = [1.5, 5.0, 9.46, 0.035]  # alpha, n, mu, sigma
+bounds = ([0.1, 1, 9.4, 0], [5, 20, 9.5, 0.1])  # alpha>0, n>1, sigma>0
+
+popt, pcov = curve_fit(new_crystal_ball, bin_centers_mc, entries_mc, p0=p0, bounds=bounds)
+
+print("Fitted parameters (alpha, n, mu, sigma):")
+print(popt)
+
+# ---------------------------------------------------
+# 4) Scale PDF to match histogram counts
+# ---------------------------------------------------
+N = np.sum(entries_mc)
+pdf_scaled = N * bin_width * new_crystal_ball(bin_centers_mc, *popt)
+
+# ---------------------------------------------------
+# 5) Plot histogram and fitted curve
+# ---------------------------------------------------
+fig, ax = plt.subplots(figsize=(10,6))
+
+ax.hist(xmass_mc, bins=nbins, range=hist_range, color='cyan', alpha=0.5, label='MC Data')
+ax.plot(bin_centers_mc, pdf_scaled, 'r-', linewidth=2, label='Crystal Ball Fit')
+
+ax.set_xlabel("Mass [GeV]")
+ax.set_ylabel("Counts")
+ax.set_title("Crystal Ball Fit to MC Mass Histogram")
+ax.legend()
+ax.grid(alpha=0.3)
+
+plt.show()
+
+"""
+def new_crystal_ball(x, alpha, n, mu, sigma):
+    return scipy.stats.crystalball.pdf(x, beta=alpha, m=n, loc=mu, scale=sigma)
+   
 
 
+popt, pcov = curve_fit(new_crystal_ball, bin_centers_mc, entries_mc, p0=[1.5, 5, 9.46, 0.035]) 
+print(popt)
 
-entries, bedges, _ = plt.hist(xmass, bins=500, color='cyan', label='Data')
-plt.axvline(max(xmass), color='red', linestyle='--', label='Fit range')
-plt.xlabel("Invariant mass (GeV/c²)")
-plt.ylabel("Entries per bin")
-plt.title("Υ(1S) region (data)")
-plt.legend()
+#plt.hist(xmass, bins=500, range=(9.0, 11.0), color='cyan', alpha=0.5, label='MC Data')
+fig, ax = plt.subplots(figsize=(10,6))
+#ax.hist(xmass, bins=500, range=(9.0, 11.0))
+ax.plot(bin_centers_mc, new_crystal_ball(bin_centers_mc, *popt), 'r', label='MC Data')
 plt.show()
 
 
-print(np.argmax(entries))
-print(xmass[np.argmax(entries)])
+cb_yys = new_crystal_ball(bin_centers_mc, *popt)
+res_cb = entries_mc - cb_yys
+
+plt.plot(bin_centers_mc, res_cb, 'bo', markersize=3)
+plt.axhline(0, color='k', linestyle='--')
+plt.title('Residuals (MC Data)')
+plt.xlabel('Invariant Mass (GeV/c²)')
+plt.ylabel('Residuals')     
+plt.show()
+
+def cb_norm(alpha, n, mu, sigma, a, b):
+    f = lambda xx: crystal_ball(xx, alpha, n, mu, sigma)
+    I, _ = quad(f, a, b)
+    return I
+
+def exp_pdf(x, lam):
+    return np.exp(-lam * x)
+
+def exp_norm(lam, a, b):
+    f = lambda xx: np.exp(-lam * xx)
+    I, _ = quad(f, a, b)
+    return I
+
+
+def model_pdf(x, f_s, alpha, n, mu, sigma, lam, a, b):
+    Ncb = cb_norm(alpha, n, mu, sigma, a, b)
+    Nex = exp_norm(lam, a, b)
+
+    sig = crystal_ball(x, alpha, n, mu, sigma) / Ncb
+    bkg = exp_pdf(x, lam) / Nex
+
+    return f_s * sig + (1 - f_s) * bkg
+
+"""
+
+
+
+
+
+
+"""
+
+##########################################################
+# --- NORMALISATION ON WINDOW ---
+##########################################################
+
+def cb_norm(alpha, n, mu, sigma, a, b):
+    f = lambda xx: crystal_ball(xx, alpha, n, mu, sigma)
+    I, _ = quad(f, a, b, limit=200)
+    return I
+
+def exp_pdf(x, lam):
+    return np.exp(-lam * x)
+
+def exp_norm(lam, a, b):
+    f = lambda xx: np.exp(-lam * xx)
+    I, _ = quad(f, a, b, limit=200)
+    return I
+
+
+##########################################################
+# --- FULL MODEL ---
+##########################################################
+
+def model_pdf(x, f_s, alpha, n, mu, sigma, lam, a, b):
+    Ncb = cb_norm(alpha, n, mu, sigma, a, b)
+    Nex = exp_norm(lam, a, b)
+
+    sig = crystal_ball(x, alpha, n, mu, sigma) / Ncb
+    bkg = exp_pdf(x, lam) / Nex
+
+    return f_s * sig + (1 - f_s) * bkg
+
+
+##########################################################
+# --- NEGATIVE LOG-LIKELIHOOD ---
+##########################################################
+
+def nll(pars, data, a, b):
+    f_s, alpha, n, mu, sigma, lam = pars
+    pdf = model_pdf(data, f_s, alpha, n, mu, sigma, lam, a, b)
+    return -np.sum(np.log(pdf))
+
+
+##########################################################
+# --- FIT ---
+##########################################################
+
+initial = [0.9, 1.5, 20, 9.46, 0.035, 2.0]
+bounds  = [(0,1), (0.1,5), (1,200), (9.3,9.6), (0.005,0.1), (0.01,10)]
+
+result = minimize(nll, initial, args=(data_sel, a, b),
+                  method='L-BFGS-B', bounds=bounds)
+
+print("\n--- SciPy Fit Results ---")
+names = ["f_s","alpha","n","mu","sigma","lam"]
+for name,val in zip(names, result.x):
+    print(f"{name:7s} = {val:.6f}")
+
+
+##########################################################
+# --- PLOT FIT + PULLS ---
+##########################################################
+
+# histogram
+nbins = 500
+hist, edges = np.histogram(data_sel, bins=nbins, range=(a, b))
+centres = 0.5*(edges[:-1]+edges[1:])
+err = np.sqrt(hist)
+width = edges[1] - edges[0]
+
+# expected counts
+f_s, alpha, n, mu, sigma, lam = result.x
+pdf_vals = model_pdf(centres, f_s, alpha, n, mu, sigma, lam, a, b)
+expected = pdf_vals * len(data_sel) * width
+
+# pulls
+pulls = (hist - expected)/err
+
+# plotting
+fig, (ax1, ax2) = plt.subplots(2,1,sharex=True,
+    gridspec_kw={'height_ratios':[3,1]}, figsize=(8,6))
+
+# data + fit
+ax1.errorbar(centres, hist, yerr=err, fmt='k.', label="Data")
+ax1.plot(centres, expected, 'r-', lw=2, label="Fit")
+ax1.set_ylabel("Counts")
+ax1.legend()
+
+# pulls
+ax2.axhline(0, color='k')
+ax2.plot(centres, pulls, 'ko', ms=3)
+ax2.set_ylim(-5,5)
+ax2.set_xlabel("Invariant mass (GeV)")
+ax2.set_ylabel("Pull")
+
+plt.tight_layout()
+plt.show()
+
+print(result.x)
+test =  model_pdf(xmass_small, *result.x, a, b)
+plt.plot(xmass_small, test)
+plt.hist(xmass_small, bins=500, range=(a, b), density=True, alpha=0.4)
+plt.show()  
+"""

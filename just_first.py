@@ -12,7 +12,7 @@ from iminuit import Minuit, describe
 from iminuit.cost import LeastSquares
 from iminuit.typing import Annotated, Gt
 from scipy.stats import crystalball
-   from scipy.special import erf
+from scipy.special import erf
 
 #print("iminuit version:", iminuit.__version__)
 # import data
@@ -45,8 +45,6 @@ xrapidity = list_array[2]
 xpair_mom = list_array[3]
 xfirst_mom = list_array[4]
 xsecond_mom = list_array[5]
-
-
 
 
 Ilower_bound, Iupper_bound = 9.3, 9.6

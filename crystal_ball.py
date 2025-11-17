@@ -1,4 +1,5 @@
 from matplotlib.pylab import beta, norm
+from networkx import sigma
 import numpy as np
 import matplotlib.pyplot as plt
 from pyparsing import line
@@ -17,8 +18,21 @@ from scipy.special import erf
 #print("iminuit version:", iminuit.__version__)
 # import data
 #xmass = np.loadtxt(sys.argv[1])
-f = open('/Users/nairnegillespie/Desktop/Year 4/DAH Project/mc.bin',"r")
+f = open('/Users/nairnegillespie/Desktop/Year 4/DAH Project/mc.bin',"r") #using mc data that only has upsilon (1S) peak
 datalist = np.fromfile(f,dtype=np.float32)
+# ---------------------------
+MC_FILE   = "/Users/nairnegillespie/Desktop/Year 4/DAH Project/mc.bin"      # MC with only 1S
+DATA_FILE = "/Users/nairnegillespie/Desktop/Year 4/DAH Project/ups-15-small.bin"  # real data
+
+# ---------------------------
+# Load helper to read file (6 floats per event)
+# ---------------------------
+def load_masses(path):
+    with open(path, "rb") as f:
+        arr = np.fromfile(f, dtype=np.float32)
+    nevent = int(len(arr) / 6)
+    data = arr.reshape(nevent, 6)
+    return data[:, 0]   # invariant mass column
 
 # number of events
 nevent = int(len(datalist)/6)
@@ -45,6 +59,267 @@ xrapidity = list_array[2]
 xpair_mom = list_array[3]
 xfirst_mom = list_array[4]
 xsecond_mom = list_array[5]
+
+order = np.argsort(xmass) #order the xmass array
+xmass = xmass[order]
+
+entries, bedges, _ = plt.hist(xmass, bins=500, color='cyan', label='Data')   
+plt.xlabel("Invariant mass (GeV/c²)")
+plt.ylabel("Entries per bin")
+plt.title("Υ(1S) region (mc data)")
+plt.legend()
+plt.show()
+
+
+def crystal_ball_function(x, alpha, n, xbar, sigma):
+    
+    A = (n / abs(alpha))**n * np.exp(-0.5 * abs(alpha)**2)
+    B = n / abs(alpha) - abs(alpha)
+    C = n/(abs(alpha)*(n - 1)) * np.exp(-0.5 * abs(alpha)**2)
+    D = np.sqrt(np.pi/2) * (1 + erf(abs(alpha)/np.sqrt(2)))
+    
+    N = 1 / (sigma * (C + D))
+    
+    mask = (x - xbar) / sigma > -alpha
+    gaussian_core = N * np.exp(-0.5 * ((x[mask] - xbar)/sigma)**2)
+    power_law_tail = N * A * (B - (x[~mask] - xbar)/sigma)**(-n)
+    
+    YY = np.zeros_like(x)
+    YY[mask] = gaussian_core
+    YY[~mask] = power_law_tail
+    
+    #YY = np.maximum(YY, 1e-300)
+    
+    return YY, mask
+    
+
+import numpy as np
+from scipy.optimize import minimize
+
+def neg_log_likelihood(params, data, eps=1e-300):
+    # we will optimize over unconstrained params using transforms if desired,
+    # but here params = [alpha, n, xbar, log_sigma]
+    alpha, n, xbar, log_sigma = params
+    sigma = np.exp(log_sigma)
+    pdf_vals = crystal_ball_function(data, alpha, n, xbar, sigma)
+    # protect against zeros
+    pdf_vals = np.maximum(pdf_vals, eps)
+    return -np.sum(np.log(pdf_vals))
+
+# example usage
+data = np.array(xmass)  # replace with your data array
+
+# initial guesses: alpha, n, xbar, log_sigma
+p0 = [1.0, 3.0, np.mean(data), np.log(np.std(data))]
+
+# bounds: alpha unconstrained, n>1, xbar unconstrained, log_sigma any real
+# implement n>1 by using a penalty or transform; here use bounds in minimize:
+bnds = [(None, None), (1.0001, None), (None, None), (None, None)]
+
+res = minimize(neg_log_likelihood, p0, args=(data,), bounds=bnds, method='L-BFGS-B')
+
+if res.success:
+    alpha_hat, n_hat, xbar_hat, log_sigma_hat = res.x
+    sigma_hat = np.exp(log_sigma_hat)
+    print("Fit success:", alpha_hat, n_hat, xbar_hat, sigma_hat)
+else:
+    print("Fit failed:", res.message)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+"""      
+
+def crystal_ball_trunc(x, alpha, n, xbar, sigma, a, b):
+
+    # PDF values (raw normalized to full line)
+    vals = crystal_ball_function(x, alpha, n, xbar, sigma) [0]
+
+    # compute normalization over [a,b] by integrating the raw CB function
+    # integrate.quad expects scalar function; wrap raw cb for scalar input
+def cb_scalar(t):
+    return crystal_ball_function(np.array([t]), alpha, n, xbar, sigma)[0]
+
+I, _ = integrate.quad(cb_scalar, a, b, limit=200)
+if I <= 0:
+        # numerical safeguard
+        return np.full_like(vals, 1e-300)
+    return vals / I
+
+
+def exp_trunc(x, lam, a, b):
+    lam = float(lam)
+    if lam <= 0:
+        return np.full_like(x, 1.0 / (b - a))
+    denom = 1.0 - np.exp(-lam * (b - a))
+    return (lam * np.exp(-lam * (x - a))) / denom
+
+# ---------------------------
+def nll_cb_mc(f_s, alpha, n, mu, sigma, lam, data, a, b):
+    # guard
+    if f_s <= 0 or f_s >= 1 or sigma <= 0 or n <= 1 or lam <= 0:
+        return 1e12
+
+    # compute signal pdf values normalized on [a,b]
+    sig = crystal_ball_trunc(data, alpha, n, mu, sigma, a, b)
+    bkg = exp_trunc(data, lam, a, b)
+    pdf_vals = f_s * sig + (1 - f_s) * bkg
+    if np.any(pdf_vals <= 0):
+        return 1e12
+    return -np.sum(np.log(pdf_vals))
+
+mc = load_masses(MC_FILE)
+# choose a tight window around 1S for MC
+a_mc, b_mc = 9.3, 9.6
+mc_sel = mc[(mc >= a_mc) & (mc <= b_mc)]
+print("MC events in window", len(mc_sel))
+
+# initial guesses
+init_mc = dict(f_s=0.95, alpha=1.0, n=3.0, mu=9.46, sigma=0.04, lam=0.5)
+
+# wrap nll for Minuit (Minuit likes named params)
+def nll_mc_wrap(f_s, alpha, n, mu, sigma, lam):
+    return nll_cb_mc(f_s, alpha, n, mu, sigma, lam, mc_sel, a_mc, b_mc)
+
+m_mc = Minuit(nll_mc_wrap, **init_mc)
+m_mc.errordef = Minuit.LIKELIHOOD
+
+# reasonable limits
+m_mc.limits["f_s"] = (1e-3, 0.999)
+m_mc.limits["alpha"] = (0.1, 5.0)
+m_mc.limits["n"] = (1.1, 50.0)
+m_mc.limits["mu"] = (9.4, 9.5)
+m_mc.limits["sigma"] = (1e-3, 0.2)
+m_mc.limits["lam"] = (1e-3, 5.0)
+m_mc.strategy = 1
+
+m_mc.migrad()
+m_mc.hesse()
+
+print("\n--- MC fit results (Crystal Ball) ---")
+for p in m_mc.parameters:
+    print(f"{p:6s} = {m_mc.values[p]:12.6f} ± {m_mc.errors[p]:.6f}")
+
+# Save MC shape params
+alpha_mc = m_mc.values["alpha"]
+n_mc = m_mc.values["n"]
+alpha_mc_err = m_mc.errors["alpha"]
+n_mc_err = m_mc.errors["n"]
+
+# ---------------------------
+# Plot MC fit (binned for display)
+# ---------------------------
+nbins = 150
+hist_vals, edges = np.histogram(mc_sel, bins=nbins, range=(a_mc, b_mc))
+centres = 0.5 * (edges[:-1] + edges[1:])
+width = edges[1] - edges[0]
+
+# model (signal fraction from MC fit)
+fs_mc = m_mc.values["f_s"]
+sig_vals = crystal_ball_trunc(centres, alpha_mc, n_mc, m_mc.values["mu"], m_mc.values["sigma"], a_mc, b_mc)
+bkg_vals = exp_trunc(centres, m_mc.values["lam"], a_mc, b_mc)
+model_counts = (fs_mc * sig_vals + (1 - fs_mc) * bkg_vals) * len(mc_sel) * width
+
+plt.figure(figsize=(8,5))
+plt.errorbar(centres, hist_vals, yerr=np.sqrt(hist_vals), fmt='o', ms=4, label="MC (binned)")
+xx = np.linspace(a_mc, b_mc, 1000)
+plt.plot(xx, (fs_mc * crystal_ball_trunc(xx, alpha_mc, n_mc, m_mc.values["mu"], m_mc.values["sigma"], a_mc, b_mc) + 
+              (1-fs_mc) * exp_trunc(xx, m_mc.values["lam"], a_mc, b_mc)) * len(mc_sel) * width,
+         'r-', label="CB+exp fit")
+plt.xlabel("Invariant mass (GeV)")
+plt.ylabel("Counts")
+plt.legend()
+plt.title("MC fit: Crystal Ball + exponential")
+plt.show()
+
+# ---------------------------
+# Fit DATA now using MC-informed CB shape
+# Options:
+#  - Fix alpha,n to MC values (recommended)
+#  - Or fix only alpha and float n slightly, or float both with tight priors (not implemented here)
+# ---------------------------
+data = load_masses(DATA_FILE)
+a_data, b_data = 9.3, 10.7
+data_sel = data[(data >= a_data) & (data <= b_data)]
+print("Data events in window", len(data_sel))
+
+# Use fraction-based nll for data but with alpha,n fixed
+def nll_data_wrap(f_s, mu, sigma, lam, alpha_fix=alpha_mc, n_fix=n_mc):
+    # Note: Minuit will pass f_s, mu, sigma, lam
+    return nll_cb_mc(f_s, alpha_fix, n_fix, mu, sigma, lam, data_sel, a_data, b_data)
+
+# initial guesses for data
+init_data = dict(f_s=0.15, mu=9.456, sigma=0.042, lam=0.6)
+
+m_data = Minuit(nll_data_wrap, **init_data)
+m_data.errordef = Minuit.LIKELIHOOD
+
+m_data.limits["f_s"] = (1e-6, 0.999)
+m_data.limits["mu"] = (9.42, 9.49)
+m_data.limits["sigma"] = (1e-3, 0.2)
+m_data.limits["lam"] = (1e-3, 5.0)
+m_data.strategy = 1
+
+m_data.migrad()
+m_data.hesse()
+
+print("\n--- Data fit results (alpha,n fixed to MC) ---")
+print(f"alpha (fixed) = {alpha_mc:.6f} ± {alpha_mc_err:.6f}")
+print(f"n     (fixed) = {n_mc:.6f} ± {n_mc_err:.6f}")
+for p in m_data.parameters:
+    print(f"{p:6s} = {m_data.values[p]:12.6f} ± {m_data.errors[p]:.6f}")
+
+# Convert f_s -> yield
+f_s_data = m_data.values["f_s"]
+N_data = len(data_sel)
+N_signal = f_s_data * N_data
+N_signal_err = m_data.errors["f_s"] * N_data
+print(f"\nData signal yield: {N_signal:.1f} ± {N_signal_err:.1f} (events)")
+
+# ---------------------------
+# Plot data fit & residuals
+# ---------------------------
+# top panel
+nbins = 500
+hist_vals, edges = np.histogram(data_sel, bins=nbins, range=(a_data, b_data))
+centres = 0.5*(edges[:-1] + edges[1:])
+width = edges[1] - edges[0]
+
+# model for plotting
+sig_plot = crystal_ball_trunc(centres, alpha_mc, n_mc, m_data.values["mu"], m_data.values["sigma"], a_data, b_data)
+bkg_plot = exp_trunc(centres, m_data.values["lam"], a_data, b_data)
+model_counts = (m_data.values["f_s"] * sig_plot + (1 - m_data.values["f_s"]) * bkg_plot) * len(data_sel) * width
+
+fig, (ax1, ax2) = plt.subplots(2,1, figsize=(9,8), gridspec_kw={"height_ratios":[3,1]}, sharex=True)
+ax1.errorbar(centres, hist_vals, yerr=np.sqrt(hist_vals), fmt='o', ms=4, label="Data")
+xx = np.linspace(a_data, b_data, 2000)
+ax1.plot(xx, (m_data.values["f_s"]*crystal_ball_trunc(xx, alpha_mc, n_mc, m_data.values["mu"], m_data.values["sigma"], a_data, b_data) +
+              (1-m_data.values["f_s"]) * exp_trunc(xx, m_data.values["lam"], a_data, b_data)) * len(data_sel) * width,
+         'r-', lw=2, label="Fit (CB fixed from MC)")
+ax1.set_ylabel("Counts")
+ax1.legend()
+
+# residuals/pulls
+resid = hist_vals - model_counts
+data_err = np.sqrt(hist_vals)
+pulls = resid / (data_err + 1e-9)
+ax2.axhline(0, color='k', lw=1)
+ax2.plot(centres, pulls, 'o', ms=3)
+ax2.set_ylabel("Pull")
+ax2.set_xlabel("Invariant mass (GeV)")
+ax2.set_ylim(-5,5)
+plt.tight_layout()
+plt.show()
 
 
 
@@ -208,7 +483,7 @@ plt.legend()
 plt.show()
 
 model_vals2 = comp_model(bin_centers2, mu_fit2, sigma_fit2, lamb_fit2, f_s_fit2, Ilower_bound_P2, Iupper_bound_P2)
-"""
+
 residuals2 = ydata2 - model_vals2
 residualsd2 = (ydata2 - model_vals2) / np.sqrt(ydata2)
 
@@ -220,7 +495,7 @@ plt.ylabel("Residuals")
 plt.title("Residuals of Fit to Υ(2S) Region")
 plt.legend()
 plt.show()   
-"""
+
 
 
 Ilower_bound_P3, Iupper_bound_P3 = 10.2, 10.5
@@ -263,7 +538,7 @@ plt.xlim(10.2, 10.5)
 plt.legend()
 plt.show()
 
-"""
+
 model_vals3 = comp_model(bin_centers3, mu_fit3, sigma_fit3, lamb_fit3, f_s_fit3, Ilower_bound_P3, Iupper_bound_P3)
 residuals3 = ydata3 - model_vals3
 residualsd3 = (ydata3 - model_vals3) / np.sqrt(ydata3)
@@ -278,7 +553,8 @@ plt.title("Residuals of Fit to Υ(3S) Region")
 plt.legend()
 plt.show()   
 
-"""
+
+
 
 
 
@@ -289,7 +565,7 @@ n=2
 alpha = 1
 
 def crystal_ball(x, alpha, n, xbar, sigma):
-    """Compute the normalized Crystal Ball function safely."""
+
     x = np.asarray(x, dtype=float)
     eps = 1e-12  # small offset to avoid division by zero
     
@@ -329,7 +605,6 @@ def crystal_ball(x, alpha, n, xbar, sigma):
 
 
 
-"""
 def crystal_ball(x, alpha, n, xbar, sigma):
 
     n_over_alpha = n / abs(alpha)
@@ -349,8 +624,6 @@ def crystal_ball(x, alpha, n, xbar, sigma):
     result /= np.trapz(result, x)
     return result, mask
 
-"""
-"""
 # --- Example usage ---
 alpha = 6
 n = 10
@@ -372,7 +645,7 @@ for n in ns:
     plt.title("Υ(1S) Region with Crystal Ball Model")
     plt.legend()
     plt.show()
-"""    
+ 
 
     
 alpha = 2
@@ -464,3 +737,4 @@ plt.ylabel("Residuals")
 plt.title("Residuals of Fit to Υ(3S) Region with Crystal Ball")
 plt.legend()
 plt.show()  
+"""
