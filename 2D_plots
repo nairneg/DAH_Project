@@ -1,0 +1,78 @@
+from matplotlib.pylab import norm
+import numpy as np
+import matplotlib.pyplot as plt
+from pyparsing import line
+import scipy
+from scipy.optimize import curve_fit
+from scipy import integrate
+#from scipy.optimize import minimize
+import iminuit
+from iminuit import minimize  # has same interface as scipy.optimize.minimize
+from iminuit import Minuit, describe
+from iminuit.cost import LeastSquares
+from iminuit.typing import Annotated, Gt
+from scipy.stats import crystalball
+
+#print("iminuit version:", iminuit.__version__)
+# import data
+#xmass = np.loadtxt(sys.argv[1])
+f = open('ups-15-small.bin',"r")
+datalist = np.fromfile(f,dtype=np.float32)
+
+# number of events
+nevent = int(len(datalist)/6)
+
+xdata = np.split(datalist,nevent)
+print(xdata[0])
+
+
+xdata = datalist.reshape(nevent, 6)
+
+# extract variable arrays
+
+def extract_variables(data):
+    """Extracts the 6 variable arrays (columns) from event data."""
+    list_array = [data[:, i] for i in range(data.shape[1])]
+    return list_array
+
+
+list_array = extract_variables(xdata)
+
+xmass = list_array[0]
+xpair_trans_mom = list_array[1]
+xrapidity = list_array[2]
+xpair_mom = list_array[3]
+xfirst_mom = list_array[4]
+xsecond_mom = list_array[5]
+
+
+Ilower_bound, Iupper_bound = 9.3, 9.6
+inv_mass_regionI = np.array([m for m in xmass if Ilower_bound <= m <= Iupper_bound])
+print(len(inv_mass_regionI))
+
+
+
+def twoD_plotter(XX, YY, xlabel, ylabel, title):
+    plt.figure(figsize=(7, 5))
+    plt.hist2d(XX, YY, bins=200, cmap='viridis')
+    plt.colorbar(label='Events')
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.title(title)
+    plt.tight_layout()
+    plt.show()
+
+# List of variables and labels
+variables = [
+    (xpair_trans_mom, "Pair pT [GeV]", "Mass vs Pair pT"),
+    (xrapidity,      "Rapidity",       "Mass vs Rapidity"),
+    (xpair_mom,      "Pair Momentum [GeV]", "Mass vs Pair Momentum"),
+    (xfirst_mom,     "Muon 1 Momentum [GeV]", "Mass vs Muon 1 Momentum"),
+    (xsecond_mom,    "Muon 2 Momentum [GeV]", "Mass vs Muon 2 Momentum"),
+]
+
+# Produce all 5 plots
+for Y, ylabel, title in variables:
+    twoD_plotter(xmass, Y, "Invariant Mass [GeV]", ylabel, title)
+    
+Purity = need to figure out

@@ -1,10 +1,10 @@
 import numpy as np
+from scipy import special
+from iminuit import Minuit
 import matplotlib.pyplot as plt
-from scipy.optimize import curve_fit
-from scipy import integrate
-# import data
-#xmass = np.loadtxt(sys.argv[1])
-f = open("ups-15-small.bin","r")
+
+
+f = open('ups-15-small.bin',"r")
 datalist = np.fromfile(f,dtype=np.float32)
 
 # number of events
@@ -33,67 +33,93 @@ xpair_mom = list_array[3]
 xfirst_mom = list_array[4]
 xsecond_mom = list_array[5]
 
+# -----------------------------
+#   DATA: SELECT THE 1S REGION
+# -----------------------------
+a = 9.0    # lower bound of fit range
+b = 9.8     # upper bound of fit range
 
-# --- Select Υ(1S) region ---
-Ilower_bound, Iupper_bound = 9.3, 9.6
-inv_mass_regionI = np.array([m for m in xmass if Ilower_bound <= m <= Iupper_bound])
+data = xmass[(xmass >= a) & (xmass <= b)]
+Ndata = len(data)
 
-entries, bedges, _ = plt.hist(inv_mass_regionI, bins=100, histtype='step', color='cyan', label='Data')
-plt.xlabel("Invariant mass (GeV/c²)")
-plt.ylabel("Entries per bin")
-plt.title("Υ(1S) region (data)")
+# -----------------------------
+#   NORMALISED PDFs
+# -----------------------------
+def gauss_int(mu, sigma, a=a, b=b):
+    z1 = (a - mu) / (np.sqrt(2)*sigma)
+    z2 = (b - mu) / (np.sqrt(2)*sigma)
+    return sigma * np.sqrt(np.pi/2) * (special.erf(z2) - special.erf(z1))
+
+def pdf_gauss(x, mu, sigma):
+    I = gauss_int(mu, sigma)
+    return np.exp(-0.5*((x - mu)/sigma)**2) / I
+
+def exp_int(lamb, a=a, b=b):
+    if lamb < 1e-12:
+        return b - a
+    return (np.exp(-lamb*a) - np.exp(-lamb*b)) / lamb
+
+def pdf_exp(x, lamb):
+    I = exp_int(lamb)
+    return np.exp(-lamb*x) / I
+
+# -----------------------------
+#   EXTENDED NEGATIVE LOG-LIKE
+# -----------------------------
+def nll(mu, sigma, Ns, lamb, Nbkg):
+    if sigma <= 0 or Ns < 0 or Nbkg < 0 or lamb < 0:
+        return 1e12
+
+    ps = pdf_gauss(data, mu, sigma)
+    pb = pdf_exp(data, lamb)
+
+    model = Ns * ps + Nbkg * pb
+    if np.any(model <= 0):
+        return 1e12
+
+    Ntot = Ns + Nbkg            # extended term
+    return Ntot - np.sum(np.log(model))
+
+# -----------------------------
+#   MINUIT FIT
+# -----------------------------
+m = Minuit(nll,
+           mu=9.46, sigma=0.05, Ns=20000,
+           lamb=1.0, Nbkg=2000)
+
+m.errordef = Minuit.LIKELIHOOD
+
+# Parameter limits
+m.limits["mu"]    = (9.2, 9.7)
+m.limits["sigma"] = (0.005, 0.15)
+m.limits["Ns"]    = (0, 1e6)
+m.limits["lamb"]  = (0, 20)
+m.limits["Nbkg"]  = (0, 1e6)
+
+m.migrad()
+m.hesse()
+
+print(m)
+
+# -----------------------------
+#   PLOT THE RESULT
+# -----------------------------
+xx = np.linspace(a, b, 800)
+bw = (b - a) / 100
+
+signal   = m.values["Ns"]   * pdf_gauss(xx, m.values["mu"], m.values["sigma"]) * bw
+bkg      = m.values["Nbkg"] * pdf_exp(xx, m.values["lamb"]) * bw
+total    = signal + bkg
+
+plt.figure(figsize=(8,5))
+plt.hist(data, bins=100, range=(a,b), alpha=0.6, color="gray", label="Data")
+
+plt.plot(xx, total, 'k-', lw=2, label="Total Fit")
+plt.plot(xx, signal, 'r--', lw=2, label="Gaussian (Υ1S)")
+plt.plot(xx, bkg, 'b--', lw=2, label="Background")
+
+plt.xlabel("Invariant mass (GeV)")
+plt.ylabel("Counts per bin")
+plt.title("Υ(1S) Fit: Gaussian + Exponential Background")
 plt.legend()
 plt.show()
-
-bin_centers = 0.5 * (bedges[:-1] + bedges[1:])
-
-# --- Define normalized components ---
-def normalized_gauss(x, mu, sigma, a, b):
-    """Normalized Gaussian on [a,b]."""
-    integral, _ = integrate.quad(lambda xx: np.exp(-0.5*((xx - mu)/sigma)**2), a, b)
-    N = 1.0 / (sigma * np.sqrt(2*np.pi) * integral)
-    return N * np.exp(-0.5 * ((x - mu)/sigma)**2)
-
-def normalized_exp(x, lamb, a, b):
-    """Normalized falling exponential on [a,b]."""
-
-    if abs(lamb) < 1e-9: 
-        return np.full_like(x, 1/ (b - a))
-    integral, _ = integrate.quad(lambda xx: np.exp(-lamb * xx), a, b)
-    norm = lamb * np.exp(-lamb*x) / integral
-    return norm
-
-# --- Composite model ---
-def comp_model(x, mu, sigma, lamb, f_s, a=Ilower_bound, b=Iupper_bound):
-    """Composite PDF: signal fraction f_s * Gaussian + (1-f_s) * exponential."""
-    return f_s * normalized_gauss(x, mu, sigma, a, b) + (1 - f_s) * normalized_exp(x, lamb, a, b)
-
-# --- Fit model to histogram (binned likelihood via curve_fit) ---
-# convert counts to densities
-ydata = entries / np.trapz(entries, bin_centers)
-
-# initial guesses: μ, σ, λ, f_s
-p0 = [9.46, 0.05, 2.0, 0.5]
-bounds = ([9.3, 0.01, 0.1, 0.0], [9.6, 0.2, 10.0, 1.0])
-
-parameters, pcov = curve_fit(lambda x, mu, sigma, lamb, f_s: comp_model(x, mu, sigma, lamb, f_s),
-                             bin_centers, ydata, p0=p0, bounds=bounds)
-
-mu_fit, sigma_fit, lamb_fit, f_s_fit = parameters
-print(f"μ = {mu_fit:.4f} GeV")
-print(f"σ = {sigma_fit:.4f} GeV")
-print(f"λ = {lamb_fit:.3f} GeV⁻¹")
-print(f"f_s = {f_s_fit:.3f}")
-
-# --- Plot result ---
-plt.hist(inv_mass_regionI, bins=100, density=True, histtype='step', color='cyan', label='Data')
-m_plot = np.linspace(Ilower_bound, Iupper_bound, 500)
-plt.plot(m_plot, comp_model(m_plot, mu_fit, sigma_fit, lamb_fit, f_s_fit),
-         'r-', label='Gaussian + Exponential (fit)')
-plt.xlabel("Invariant mass (GeV/c²)")
-plt.ylabel("Probability density")
-plt.title("Υ(1S) composite normalized fit")
-plt.legend()
-plt.show()
-
-
