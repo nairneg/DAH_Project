@@ -1,0 +1,183 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
+from scipy import integrate
+
+f = open('ups-15-small.bin',"r")
+datalist = np.fromfile(f,dtype=np.float32)
+
+# number of events
+nevent = int(len(datalist)/6)
+
+xdata = np.split(datalist,nevent)
+print(xdata[0])
+
+
+xdata = datalist.reshape(nevent, 6)
+
+# extract variable arrays
+
+def extract_variables(data):
+    """Extracts the 6 variable arrays (columns) from event data."""
+    list_array = [data[:, i] for i in range(data.shape[1])]
+    return list_array
+
+
+list_array = extract_variables(xdata)
+
+xmass = list_array[0]
+xpair_trans_mom = list_array[1]
+xrapidity = list_array[2]
+xpair_mom = list_array[3]
+xfirst_mom = list_array[4]
+xsecond_mom = list_array[5]
+
+# ============================================================
+#  Normalised PDF definitions
+# ============================================================
+
+def normalized_gauss(x, mu, sigma, a, b):
+    integral, _ = integrate.quad(
+        lambda xx: np.exp(-0.5*((xx - mu)/sigma)**2), a, b
+    )
+    return np.exp(-0.5*((x - mu)/sigma)**2) / integral
+
+def normalized_exp(x, lamb, a, b):
+    if abs(lamb) < 1e-12:
+        return np.full_like(x, 1/(b - a))
+    integral, _ = integrate.quad(lambda xx: np.exp(-lamb * xx), a, b)
+    return np.exp(-lamb * x) / integral
+
+
+# ============================================================
+#  Total PDF = 3 Gaussians + 1 background exponential
+# ============================================================
+
+def total_pdf(x,
+              mu1, sigma1, f1,
+              mu2, sigma2, f2,
+              mu3, sigma3, f3,
+              lamb,
+              a, b):
+
+    g1 = normalized_gauss(x, mu1, sigma1, a, b)
+    g2 = normalized_gauss(x, mu2, sigma2, a, b)
+    g3 = normalized_gauss(x, mu3, sigma3, a, b)
+    bkg = normalized_exp(x, lamb, a, b)
+
+    fsum = f1 + f2 + f3
+    if fsum >= 1:
+        return np.zeros_like(x)
+
+    return f1*g1 + f2*g2 + f3*g3 + (1 - fsum)*bkg
+
+
+# Curve-fit wrapper (SciPy requires only the parameters that vary)
+def fit_wrapper(x,
+                mu1, sigma1, f1,
+                mu2, sigma2, f2,
+                mu3, sigma3, f3,
+                lamb):
+    return total_pdf(x,
+                     mu1, sigma1, f1,
+                     mu2, sigma2, f2,
+                     mu3, sigma3, f3,
+                     lamb,
+                     low, high)
+
+
+# ============================================================
+#  Load your invariant mass data
+# ============================================================
+
+# Your xmass array must exist. Example placeholder:
+# xmass = np.loadtxt("your_data_file.txt")
+
+# Define full range
+low, high = np.min(xmass), np.max(xmass)
+
+# Histogram full dataset
+entries, edges = np.histogram(xmass, bins=400, range=(low, high))
+centers = 0.5 * (edges[:-1] + edges[1:])
+
+# Convert histogram to probability density
+norm = np.trapz(entries, centers)
+ydata = entries / norm
+
+
+# ============================================================
+#  Initial guesses and bounds
+# ============================================================
+
+p0 = [
+    9.46, 0.06, 0.12,   # Upsilon(1S)
+    10.02, 0.06, 0.06,  # Upsilon(2S)
+    10.36, 0.06, 0.03,  # Upsilon(3S)
+    1.0                 # background slope
+]
+
+bounds = (
+    [9.3, 0.01, 0,    9.7, 0.01, 0,    10.2, 0.01, 0,     0.01],
+    [9.6, 0.15, 1,   10.1, 0.15, 1,    10.5, 0.15, 1,    10.0]
+)
+
+
+# ============================================================
+#  GLOBAL SIMULTANEOUS FIT
+# ============================================================
+
+params, pcov = curve_fit(
+    fit_wrapper,
+    centers,
+    ydata,
+    p0=p0,
+    bounds=bounds
+)
+
+perr = np.sqrt(np.diag(pcov))
+
+print("\n===== Fit Results =====")
+labels = [
+    "mu1", "sigma1", "f1",
+    "mu2", "sigma2", "f2",
+    "mu3", "sigma3", "f3",
+    "lambda"
+]
+
+for name, val, err in zip(labels, params, perr):
+    print(f"{name:8s} = {val:.6f} ± {err:.6f}")
+
+
+# ============================================================
+#  Plot full fit + components
+# ============================================================
+
+xx = np.linspace(low, high, 2500)
+
+total_curve = fit_wrapper(xx, *params)
+
+# Extract component curves
+mu1, s1, f1, mu2, s2, f2, mu3, s3, f3, lamb = params
+
+g1 = f1 * normalized_gauss(xx, mu1, s1, low, high)
+g2 = f2 * normalized_gauss(xx, mu2, s2, low, high)
+g3 = f3 * normalized_gauss(xx, mu3, s3, low, high)
+bkg = (1 - (f1 + f2 + f3)) * normalized_exp(xx, lamb, low, high)
+
+# Plot data
+plt.hist(xmass, bins=968, density=True, alpha=0.4, color='gray', label="Data")
+
+# Plot total PDF
+plt.plot(xx, total_curve, 'k', lw=2, label="Total Fit")
+
+# Plot components
+plt.plot(xx, g1, 'r', lw=1.5, label="Υ(1S)")
+plt.plot(xx, g2, 'g', lw=1.5, label="Υ(2S)")
+plt.plot(xx, g3, 'b', lw=1.5, label="Υ(3S)")
+plt.plot(xx, bkg, 'm--', lw=1.5, label="Background")
+plt.xlim(9, 11)
+plt.xlabel("Invariant mass (GeV/c$^2$)")
+plt.ylabel("Probability density")
+plt.title("Global Simultaneous Fit: Υ(1S), Υ(2S), Υ(3S) + Background")
+plt.legend()
+plt.show()

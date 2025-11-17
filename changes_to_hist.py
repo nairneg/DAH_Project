@@ -12,6 +12,9 @@ datalist = np.fromfile(f,dtype=np.float32)
 
 # number of events
 nevent = int(len(datalist)/6)
+print(nevent)
+print(np.sqrt(nevent))
+print(1+3.22*np.log10(nevent))
 
 xdata = np.split(datalist,nevent)
 xdata = datalist.reshape(nevent, 6)
@@ -33,14 +36,30 @@ xpair_mom = list_array[3]
 xfirst_mom = list_array[4]
 xsecond_mom = list_array[5]
 
-
-
+print(len(inv_mass))
+print(np.sqrt(len(inv_mass)))
 labels = ['Invariant Mass of Muon Pairs', 'Transverse Momentum of Muon Pairs','Rapidity of Muon Pairs', 'Momentum of Muon Pairs', 'Transverse Momentum of First Muon', 'Transverse Momentum of Second Muon' ]
 x_labels = ['Invariant Mass (GeV/c^2)', 'Transverse Momentum (GeV/c)', 'Rapidity', 'Momentum (GeV/c)', 'Transverse Momentum (GeV/c)', 'Transverse Momentum (GeV/c)' ]
 y_label = 'Number of Events'
 bins = [500, 500, 500, 500, 1000, 1000]
-x_limits = [[min(inv_mass), max(inv_mass)], [0, 1000], [0, 1000], [0, 200], [0, 200]]
+#x_limits = [[min(inv_mass), max(inv_mass)], [0, 1000], [0, 1000], [0, 200], [0, 200]]
 
+print(len(xrapidity))
+     
+plt.figure(figsize=(8, 5))        # new figure each time
+plt.hist(xsecond_mom, bins=10000)
+plt.xlabel('Transverse Momentum of Second Muon (GeV/c)')
+plt.ylabel('Number of Events')
+plt.title('Transverse Momentum of Second Muon')
+plt.xlim(0, 100)
+plt.tight_layout()
+plt.show()
+
+
+
+
+
+""""
 
 def hist_maker(in_data, label,  x_label, ylabel, bins):
 
@@ -50,10 +69,12 @@ def hist_maker(in_data, label,  x_label, ylabel, bins):
     plt.xlabel(x_label)
     plt.ylabel(y_label)
     plt.title(label)
-    plt.xlim(min(in_data), max(in_data))
+   # plt.xlim(min(in_data), max(in_data))
     plt.tight_layout()
     plt.show()
     
 
 for i in range(6):
     hist_maker(list_array[i], labels[i], x_labels[i], y_label, bins[i])
+
+"""

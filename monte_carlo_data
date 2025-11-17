@@ -1,0 +1,66 @@
+from matplotlib.pylab import beta, norm
+import numpy as np
+import matplotlib.pyplot as plt
+from pyparsing import line
+import scipy
+from scipy.optimize import curve_fit
+from scipy import integrate
+#from scipy.optimize import minimize
+import iminuit
+from iminuit import minimize  # has same interface as scipy.optimize.minimize
+from iminuit import Minuit, describe
+from iminuit.cost import LeastSquares
+from iminuit.typing import Annotated, Gt
+from scipy.stats import crystalball
+from scipy.special import erf
+
+#print("iminuit version:", iminuit.__version__)
+# import data
+#xmass = np.loadtxt(sys.argv[1])
+f = open('/Users/nairnegillespie/Desktop/Year 4/DAH Project/mc.bin',"r")
+datalist = np.fromfile(f,dtype=np.float32)
+
+# number of events
+nevent = int(len(datalist)/6)
+
+xdata = np.split(datalist,nevent)
+print(xdata[0])
+
+
+xdata = datalist.reshape(nevent, 6)
+
+# extract variable arrays
+
+def extract_variables(data):
+    """Extracts the 6 variable arrays (columns) from event data."""
+    list_array = [data[:, i] for i in range(data.shape[1])]
+    return list_array
+
+
+list_array = extract_variables(xdata)
+
+xmass = list_array[0]
+xpair_trans_mom = list_array[1]
+xrapidity = list_array[2]
+xpair_mom = list_array[3]
+xfirst_mom = list_array[4]
+xsecond_mom = list_array[5]
+
+
+
+Ilower_bound, Iupper_bound = 9.3, 9.6
+inv_mass_regionI = np.array([m for m in xmass if Ilower_bound <= m <= Iupper_bound])
+
+
+
+entries, bedges, _ = plt.hist(xmass, bins=500, color='cyan', label='Data')
+plt.axvline(max(xmass), color='red', linestyle='--', label='Fit range')
+plt.xlabel("Invariant mass (GeV/c²)")
+plt.ylabel("Entries per bin")
+plt.title("Υ(1S) region (data)")
+plt.legend()
+plt.show()
+
+
+print(np.argmax(entries))
+print(xmass[np.argmax(entries)])
