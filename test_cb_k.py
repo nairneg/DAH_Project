@@ -2,6 +2,7 @@ import numpy as np
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 from scipy.stats import crystalball
+import minuit as mn
 
 def file_read(f_path):
     """
