@@ -13,8 +13,8 @@ def file_read(f_path):
     xdata = datalist.reshape(nevent, 6)
     return xdata
 
-xdata = file_read('/Users/nairnegillespie/Desktop/Year 4/DAH Project/mc.bin')
-xdata_LHCB = file_read('/Users/nairnegillespie/Desktop/Year 4/DAH Project/ups-15-small.bin')
+xdata = file_read('C:/Users/K_muk/OneDrive - University of Edinburgh/Physics Year 4/Data Acquisition & Handling/DAH Project/mc.bin')
+xdata_LHCB = file_read('C:/Users/K_muk/OneDrive - University of Edinburgh/Physics Year 4/Data Acquisition & Handling/DAH Project/ups-15-small.bin')
 
 def extract_variables(data):
     """
@@ -127,16 +127,17 @@ plt.show()
 def fitting_to_LHCb_data(x_LHCB, params_found_for_mc):
     y_fit = model(x_LHCB, *params_found_for_mc)
     y_LHCB_own_params = curve_fit(model, x_LHCB, y_LHCB, p0=params_found_for_mc)[0]
-
-    return y_fit, y_LHCB_own_params
+    yfit_with_own_params = model(x_LHCB, *y_LHCB_own_params)
+    return y_fit, y_LHCB_own_params, yfit_with_own_params
     
 
-yfit_with_mc_params, yfit_with_own_params = fitting_to_LHCb_data(x_LHCB, popt)
+yfit_with_mc_params, y_LHCB_own_params, yfit_with_own_params = fitting_to_LHCb_data(x_LHCB, popt)
+
 
 
 #plt.plot(x_LHCB, y_LHCB, label='LHCb Data', marker='o', linestyle='', markersize=3)
 plt.plot(x_LHCB, yfit_with_mc_params, label='Fit to LHCb Data using MC Parameters', color='red')
-#plt.plot(x_LHCB, yfit_with_own_params, label='Fit to LHCb Data using Own Parameters', color='green')
+plt.plot(x_LHCB, yfit_with_own_params, label='Fit to LHCb Data using Own Parameters', color='green')
 plt.hist(xmass_LHCB, bins=500, range=(9.0, 11.0), alpha=0.4, label='LHCb data histogram')
 plt.xlim(9.3, 9.6)
 plt.xlabel('Invariant Mass (GeV/c²)')
