@@ -128,6 +128,7 @@ def fitting_to_LHCb_data(x_LHCB, params_found_for_mc):
     y_fit = model(x_LHCB, *params_found_for_mc)
     y_LHCB_own_params = curve_fit(model, x_LHCB, y_LHCB, p0=params_found_for_mc)[0]
     yfit_with_own_params = model(x_LHCB, *y_LHCB_own_params)
+    
     return y_fit, y_LHCB_own_params, yfit_with_own_params
     
 
