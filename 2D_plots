@@ -59,6 +59,7 @@ def twoD_plotter(XX, YY, xlabel, ylabel, title):
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.title(title)
+    plt.xlim(9.3, 9.6)
     plt.tight_layout()
     plt.show()
 
