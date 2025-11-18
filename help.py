@@ -13,9 +13,8 @@ def file_read(f_path):
     xdata = datalist.reshape(nevent, 6)
     return xdata
 
-
-
 xdata = file_read('/Users/nairnegillespie/Desktop/Year 4/DAH Project/mc.bin')
+xdata_LHCB = file_read('/Users/nairnegillespie/Desktop/Year 4/DAH Project/ups-15-small.bin')
 
 def extract_variables(data):
     """
@@ -24,6 +23,7 @@ def extract_variables(data):
     return [data[:, i] for i in range(data.shape[1])]       
 
 xmass, xpt, rap, p, p1, p2 = extract_variables(xdata)
+xmass_LHCB, xpt_LHCB, rap_LHCB, p_LHCB, p1_LHCB, p2_LHCB = extract_variables(xdata_LHCB)
 
 
 # === replace these with your histogram arrays ===
@@ -33,11 +33,17 @@ xmass, xpt, rap, p, p1, p2 = extract_variables(xdata)
 # counts, bin_edges = np.histogram(data, bins=..., range=...)
 
 counts, bin_edges = np.histogram(xmass, bins=500, range=(9.0, 11.0))
+counts_LHCB, bin_edges_LHCB = np.histogram(xmass_LHCB, bins=500, range=(9.0, 11.0))
 
 # For this snippet assume you already have counts & bin_edges:
 bin_centers = 0.5*(bin_edges[:-1] + bin_edges[1:])
 x = bin_centers
 y = counts
+
+
+bin_centres_LHCB = 0.5*(bin_edges_LHCB[:-1] + bin_edges_LHCB[1:])
+x_LHCB = bin_centres_LHCB
+y_LHCB = counts_LHCB
 # uncertainties: sqrt(N) ; avoid zero by using 1 for empty bins or small floor
 sigma = np.sqrt(y)
 sigma[sigma == 0] = 1.0
@@ -80,9 +86,75 @@ chi2 = np.sum((resid/sigma)**2)
 ndof = len(y) - len(popt)
 print(f"chi2/ndof = {chi2:.2f}/{ndof} = {chi2/ndof:.2f}")
 
+"""
+
+def crystal_ball(x, alpha, n, mu, sigma):
+    x = np.asarray(x)
+    t = (x - mu) / sigma
+    a = abs(alpha)
+
+    A = (n/a)**n * np.exp(-0.5 * a**2)
+    B = (n/a) - a
+
+    y = np.zeros_like(x)
+    mask = t > -a
+
+    y[mask] = np.exp(-0.5 * t[mask]**2)
+    y[~mask] = A * (B - t[~mask])**(-n)
+
+    return y
+# Fit using curve_fit
+
+
+p0_cb = [1.5, 5.0, 9.46, 0.035]  # alpha, n, mu, sigma
+popt_cb, pcov_cb = curve_fit(crystal_ball, x, y, p0=p0_cb, sigma=sigma, absolute_sigma=True)
+perr_cb = np.sqrt(np.diag(pcov_cb))
+print("\nBest-fit parameters (Crystal Ball):")
+names_cb = ['alpha','n','mu','sigma']
+for n,v,e in zip(names_cb, popt_cb, perr_cb):
+    print(f" {n} = {v:.4g} ± {e:.4g}")  
+    
+plt.figure(figsize=(10,6))
+plt.hist(xmass, bins=500, range=(9.0, 11.0), color='cyan', alpha=0.5, label='MC Data')
+#plt.plot(x, model(x, *popt), 'r-', linewidth=2, label='Two Gaussians + Exp Fit')
+plt.plot(x, crystal_ball(x, *popt_cb), 'g--', linewidth=2, label='Crystal Ball Fit')
+plt.xlabel('Invariant Mass (GeV/c²)')
+plt.ylabel('Counts')
+plt.legend()
+plt.title('Fit to Invariant Mass Distribution')
+plt.show()
+"""
+def fitting_to_LHCb_data(x_LHCB, params_found_for_mc):
+    y_fit = model(x_LHCB, *params_found_for_mc)
+    y_LHCB_own_params = curve_fit(model, x_LHCB, y_LHCB, p0=params_found_for_mc)[0]
+
+    return y_fit, y_LHCB_own_params
+    
+
+yfit_with_mc_params, yfit_with_own_params = fitting_to_LHCb_data(x_LHCB, popt)
+
+
+#plt.plot(x_LHCB, y_LHCB, label='LHCb Data', marker='o', linestyle='', markersize=3)
+plt.plot(x_LHCB, yfit_with_mc_params, label='Fit to LHCb Data using MC Parameters', color='red')
+#plt.plot(x_LHCB, yfit_with_own_params, label='Fit to LHCb Data using Own Parameters', color='green')
+plt.hist(xmass_LHCB, bins=500, range=(9.0, 11.0), alpha=0.4, label='LHCb data histogram')
+plt.xlim(9.3, 9.6)
+plt.xlabel('Invariant Mass (GeV/c²)')
+plt.ylabel('Counts')
+plt.title('Fit to LHCb Invariant Mass Distribution using MC Parameters')    
+plt.legend()
+plt.show()
+
+
+
+
+
+"""
+
 # Plot
 plt.figure(figsize=(7,4))
-plt.plot(x, y, label='data')
+plt.hist(xmass, bins=500, range=(9.0, 11.0), alpha=0.4, label='data')
+#plt.plot(x, y, label='data')
 plt.plot(x, model(x, *popt), label='fit')
 #plt.plot(xs, popt[0]*np.exp(-0.5*((xs-popt[1])/popt[2])**2), ls='--', label='G1')
 #plt.plot(xs, popt[3]*np.exp(-0.5*((xs-popt[4])/popt[5])**2), ls='--', label='G2')
@@ -93,7 +165,7 @@ plt.ylabel('counts')
 plt.tight_layout()
 plt.show()
 
-"""residuals = y - model(x, *popt)"""
+#residuals = y - model(x, *popt)
 res = y - model(x, *popt)
 plt.figure(figsize=(7,4))
 plt.plot(x, res, marker='o', ls='', label='residuals')
@@ -102,3 +174,6 @@ plt.xlabel('invariant mass')
 plt.ylabel('residuals')
 plt.tight_layout()
 plt.show()
+
+
+"""
